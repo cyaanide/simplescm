@@ -2,7 +2,11 @@ import sys
 from expressions import *
 
 class SynError(Exception):
-    pass
+    def __init__(self, message):
+        super().__init__(message)
+
+    def __str__(self):
+        return f"Error: {self.args[0]}"
 
 class Interpreter:
 
@@ -12,13 +16,30 @@ class Interpreter:
         self.current = 0
         self.tokens = []
 
+    def report(self, char, msg):
+        start = char
+        while(start > 0 and self.code[start] != '\n'):
+            start -= 1
+        if(self.code[start] == "\n"):
+            start += 1
+        end = char
+        while(end < self.code_len and self.code[end] != '\n'):
+            end += 1
+        string = self.code[start:end]
+        print(string)
+        for i in range(char - start):
+            print("_", end = "")
+        print("/")
+        a =  SynError("Error at character " + str(char) + ": " + msg)
+        print(a)
+        exit(1)
+
     def __str__(self):
         return self.code
     
     def consume_number_from(self, start, until=None):
         start_backup = start
         eof = self.code_len if until == None else until
-        # while((not self.is_this_eof(start)) and (not self.code[start].isspace())):
         while((not start >= eof) and (not self.code[start].isspace())):
             start += 1
         float_str = self.code[start_backup:start] 
@@ -26,7 +47,7 @@ class Interpreter:
             float(float_str)
             return start
         except:
-            raise SynError("Error at character " + str(start_backup) + ", " + repr(float_str) + " not a number")
+            self.report(start_backup, repr(float_str) + " is not a number")
     
     def consume_string_from(self, start, until=None):
         # as start is at ", move one place forward
@@ -49,20 +70,24 @@ class Interpreter:
             raise SynError("Error at character " + str(start) + ", Invalid boolean value #" + self.code[start])
         return start + 1
     
-    # def consume_word_from_until(self, start, end):
-    #     if(start == end):
-    #         return start
-    #     while(True):
-    #         # We have reached the boundry, return the word so far
-    #         if(start == end - 1):
-    #             return end
-    #         if(not self.code[start].isspace()):
-    #             start += 1
-    #         else:
-    #             return start
-
     def consume_word_from(self, start, until=None):
         eof = self.code_len if until == None else until
+        while(True):
+            if(start >= eof):
+                return start
+            if(self.code[start] == '(' or self.code[start] == ')'):
+                raise SynError("Error at " + str(start) + ", Unpected " + self.code[start])
+            if(not self.code[start].isspace()):
+                start += 1
+            else:
+                return start
+
+    def consume_var_from(self, start, until=None):
+        eof = self.code_len if until == None else until
+        if(start >= eof):
+            return start
+        if(not self.code[start].isalpha()):
+            raise SynError("Error at character " + str(start) + ", variable does not start with an alphabet")
         while(True):
             if(start >= eof):
                 return start
@@ -72,12 +97,13 @@ class Interpreter:
                 return start
 
     def consume_parenthesis_from(self, start, until=None):
+        start_backup = start
         eof = self.code_len if until == None else until
         left_brackets_no = 1
         start += 1
         while(True):
             if(start >= eof):
-                raise SynError("Error at character " + str(start) + ". Missing closing bracket")
+                self.report(start_backup, "Missing closing bracket")
             elif(self.code[start] == '('):
                 left_brackets_no += 1
             elif(self.code[start] == ')'):
@@ -88,12 +114,135 @@ class Interpreter:
                     left_brackets_no -= 1
             start += 1
     
-    def is_this_eof(self, x):
-        return x >= self.code_len
-    
     def is_special_form(self, str):
-        print("checking to see if", str, "is a special form")
-        return str in ["quote", "lambda", "if", "and", "or", "let", "set!", "begin"]
+        return str in ["quote", "lambda", "if", "and", "or", "let", "set!", "begin", "define"]
+
+    def consume_and_process_expressions(self, start, end):
+        # consume multiple expression from start till the end, and return the list
+        expressions = []
+        (expression_start, expression_end) = self.consume_expression(start, end)
+        while(expression_end != None):
+            expression = self.process_expression(expression_start, expression_end)
+            expressions.append(expression)
+            start = expression_end
+            (expression_start, expression_end) = self.consume_expression(start, end)
+        return expressions
+
+            
+    def dispach_lambda(self, start, end):
+        (variables_start, variables_end) = self.consume_expression(start, end)
+        if(variables_end == None):
+            raise SynError("Error at " + str(start) + " no bound variable list")
+        # This is to make sure we have parenthesis around the variable bound list
+        if(not ((self.code[variables_start] == '(') and (self.code[variables_end-1] == ')'))):
+            raise SynError("Error at " + str(variables_start) + ", bound variable list not in proper format. Make sure the variables are enclosed in parenthesis")
+        # Make sure every expression in the variable bound list is a variable
+        variable_list = self.consume_and_process_expressions(variables_start + 1, variables_end - 1)
+        for var in variable_list:
+            if(not isinstance(var, SVariable)):
+                raise SynError("Error at " + str(variables_start) + " not all members of bound variable list are variables")
+        body = self.consume_and_process_expressions(variables_end, end)
+        if(len(body) == 0):
+            raise SynError("Error at " + str(variables_end)+ " no body in lambda expression")
+        return SLambda(variable_list, body)
+
+    def dispach_if(self, start, end):
+        (test_start, test_end) = self.consume_expression(start, end)
+        if(test_end == None):
+            raise SynError("Error at " + str(start) + ", no test for 'if' special form")
+        test = self.process_expression(test_start, test_end)
+        (consequent_start, consequent_end) = self.consume_expression(test_end, end)
+        if(consequent_end == None):
+            raise SynError("Error at " + str(start) + ", no consequent for 'if' special form")
+        consequent = self.process_expression(consequent_start, consequent_end)
+        (alternative_start, alternative_end) = self.consume_expression(consequent_end, end)
+        if(alternative_end == None):
+            raise SynError("Error at " + str(start) + ", no alternative for 'if' special form")
+        alternative = self.process_expression(alternative_start, alternative_end)
+        # Try consuming one more expression to see if the IF statement has more than 3 expressions in it
+        nxt, nxt_end = self.consume_expression(alternative_end, end)
+        if(nxt_end != None):
+            raise SynError("Error at " + str(alternative_end) + ", If contains more expressions than required")
+        return SIf(test, consequent, alternative) 
+    
+    # start is the special form end
+    def dispach_let(self, start, end):
+        var_bindings_start, var_bindings_end = self.consume_expression(start, end)
+        # Empty let
+        if(var_bindings_end == None):
+            self.report(start, "improper let")
+        # The call below will return SProcedureApplications, re-purpose them for the let variable bindings
+        bindings = self.consume_and_process_expressions(var_bindings_start + 1, var_bindings_end - 1)
+        if(len(bindings) < 1):
+            self.report(var_bindings_start, "improper let, should have atleast one variable binding")
+        var_bindings = []
+        for binding in bindings:
+            if(not isinstance(binding, SProcApplication)):
+                self.report(var_bindings_start, "improper let, the let variable bindings should of of form ((<variable> <expression)...)")
+            var = binding.operator
+            if(not isinstance(var, SVariable)):
+                self.report(var_bindings_start, "improper let, can only bind expressions to variables")
+            exp = binding.operands
+            if(len(exp) != 1):
+                self.report(var_bindings_start, "improper let, every variable binding should have one expression")
+            exp = exp[0]
+            var_bindings.append((var, exp))
+
+
+        # extract the sequence of expressions
+        let_body_start, let_body_end = self.consume_expression(var_bindings_end, end)
+        if(let_body_end == None):
+            self.report(let_body_start, "improper let, should have the let body")
+        if(not self.code[let_body_start] == '('):
+            self.report(let_body_start, "improper let, missing (")
+        expressions = self.consume_and_process_expressions(let_body_start + 1, let_body_end - 1)
+        if(len(expressions) == 0):
+            self.report(let_body_start, "improper let, the body should contain atleast one expression")
+
+        return SLet(var_bindings, expressions)
+
+    # In order to use functions process and consume expression, I've had to get a little creative with process_quote
+    # Pass with process_multiple=True if you want to process a scheme list
+    def process_quote(self, start, end, process_multiple=False):
+        if(process_multiple):
+            exp_start, exp_end = self.consume_expression(start, end)
+            if(exp_end == None):
+                return None
+            quotes = []
+            while(True):
+                if(exp_start == None):
+                    return SList(quotes)
+                if(self.code[exp_start] == '('):
+                    # we need to process a list
+                    list_obj = self.process_quote(exp_start+1, exp_end-1, process_multiple=True)
+                    if(list_obj == None):
+                        quotes.append(SEmptyList())
+                    else:
+                        quotes.append(list_obj)
+                else:
+                    exp = self.process_expression(exp_start, exp_end)
+                    if(isinstance(exp, SVariable)):
+                        exp = SSymbol(exp.value)
+                    quotes.append(exp)
+                exp_start, exp_end = self.consume_expression(exp_end, end)
+        else:
+            # we only have to process a single thing
+            exp_start, exp_end = self.consume_expression(start, end)
+            if(exp_end == None):
+                self.report(start, "improper quote, quote needs atleast one argument")
+            second_exp_start, second_exp_end = self.consume_expression(exp_end, end)
+            if(second_exp_end != None):
+                self.report(second_exp_start, "improper quote, quote only takes one argument")
+            if(self.code[exp_start] == '('):
+                ans = self.process_quote(exp_start+1, exp_end-1, process_multiple=True)
+                if(ans == None):
+                    return SEmptyList()
+                return ans
+            else:
+                exp = self.process_expression(exp_start, exp_end)
+                if(isinstance(exp, SVariable)):
+                    exp = SSymbol(exp.value)
+                return exp
 
     # Given the start of the special form (where the first char of special form beigns) and the end is the pos of )
     # when sliced it can't see the ()'s
@@ -101,40 +250,57 @@ class Interpreter:
         special_form_end = self.consume_word_from(start, end)
         special_form = self.code[start:special_form_end]
         if(special_form == "quote"):
-            pass
+            # Take in a list of variables, which might contain list in itself
+            objs = self.process_quote(special_form_end, end)
+            return objs
         if(special_form == "lambda"):
-            pass
+            return self.dispach_lambda(special_form_end, end)
         if(special_form == "if"):
-            (test_start, test_end) = self.consume_expression(special_form_end, end)
-            if(test_end == None):
-                raise SynError("Error at " + str(special_form_end) + ", no test for 'if' special form")
-            test = self.process_expression(test_start, test_end)
-            (consequent_start, consequent_end) = self.consume_expression(test_end, end)
-            if(consequent_end == None):
-                raise SynError("Error at " + str(special_form_end) + ", no consequent for 'if' special form")
-            consequent = self.process_expression(consequent_start, consequent_end)
-            (alternative_start, alternative_end) = self.consume_expression(consequent_end, end)
-            if(alternative_end == None):
-                raise SynError("Error at " + str(special_form_end) + ", no alternative for 'if' special form")
-            alternative = self.process_expression(alternative_start, alternative_end)
-            return SIf(test, consequent, alternative) 
+            return self.dispach_if(special_form_end, end)
         if(special_form == "and"):
-            pass
+            # take in a a number of scheme expressions
+            and_expressions = self.consume_and_process_expressions(special_form_end, end)
+            return SAnd(and_expressions)
         if(special_form == "or"):
-            pass
+            # take in a a number of scheme expressions
+            or_expressions = self.consume_and_process_expressions(special_form_end, end)
+            return SOr(or_expressions)
         if(special_form == "let"):
-            pass
+            # take in a list of variable bindings and then a list of scheme expressions
+            return self.dispach_let(special_form_end, end)
         if(special_form == "set!"):
-            pass
+            # take in a variable and an expression
+            set_expressions = self.consume_and_process_expressions(special_form_end, end)
+            if(len(set_expressions) != 2):
+                self.report(special_form_end, "improper set, set should contain a variable and an single expression")
+            if(not isinstance(set_expressions[0], SVariable)):
+                self.report(special_form_end, "improper set, the first argument has to be a variable")
+            if(not isinstance(set_expressions[1], Expression)):
+                self.report(special_form_end, "improper set, the second argument has to be a variable")
+            return SSet(set_expressions[0], set_expressions[1])
+        # begin is not a special form
         if(special_form == "begin"):
-            pass
+            set_expressions = self.consume_and_process_expressions(special_form_end, end)
+            return SBegin(set_expressions)
+            # take in a number of scheme expressions
+        if(special_form == "define"):
+            define_expressions = self.consume_and_process_expressions(special_form_end, end)
+            if(len(define_expressions) != 2):
+                self.report(special_form_end, "define should only have 2 arguments")
+            var = define_expressions[0]
+            if(not isinstance(var, SVariable)):
+                self.report(special_form_end, "first argument to define should be a variable")
+            exp = define_expressions[1]
+            if(not isinstance(exp, Expression)):
+                self.report(special_form_end, "second arguemnt to define should be a scheme expression")
+            return SDefine(var, exp)
         
-
+        
     
     # start is the ( and end is the character after )
     # When string sliced, this procedure can see the string it is trying to process
     def process_expression(self, start, end):
-        print("processing expression: " + self.code[start:end])
+        # print("processing expression: " + self.code[start:end])
         c = self.code[start]
         # Number
         if(c.isnumeric()):
@@ -169,8 +335,10 @@ class Interpreter:
                 # Extract the operator
                 operator_start = first_word_start
                 (x, operator_end) = self.consume_expression(operator_start, end - 1)
-                if(x != operator_start):
-                    raise SynError("should never get here")
+                print(operator_end)
+                if(operator_end == None):
+                    self.report(start, "improper procedure application")
+                    # This is an expression with nothing in it
                 operator = self.process_expression(operator_start, operator_end)
                 
                 # Process the operands
@@ -244,14 +412,7 @@ class Interpreter:
             return (start, end)
     
     def produce_tokens(self):
-        expressions = []
-        (expression_start, expression_end) = self.consume_expression(self.current)
-        while(expression_end != None):
-            expression = self.process_expression(expression_start, expression_end)
-            expressions.append(expression)
-            self.current = expression_end
-            (expression_start, expression_end) = self.consume_expression(self.current)
-        return expressions
+        return self.consume_and_process_expressions(0, self.code_len)
 
 if __name__ == "__main__":
     filename = sys.argv[1]
@@ -260,9 +421,5 @@ if __name__ == "__main__":
     interpreter = Interpreter(code)
     tokens = interpreter.produce_tokens()
     print(tokens)
-    for i in tokens:
-        print(type(i))
-    
-
 
 
