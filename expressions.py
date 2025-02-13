@@ -3,10 +3,13 @@ class SError(Exception):
     pass
 
 class Expression:
-    pass
+    def __init__(self):
+        self.tail = None
+
 
 class SNumber(Expression):
     def __init__(self, num):
+        super().__init__()
         if(type(num) != float):
             raise SError("SNumber: not a float")
         self.value = num
@@ -16,6 +19,7 @@ class SNumber(Expression):
 
 class SString(Expression):
     def __init__(self, string):
+        super().__init__()
         if(type(string) != str):
             raise SError("SString: not a string")
         self.value = string
@@ -26,6 +30,7 @@ class SString(Expression):
 
 class SSymbol(Expression):
     def __init__(self, string):
+        super().__init__()
         if(type(string) != str):
             raise SError("SSymbol: not a string")
         self.value = string
@@ -35,6 +40,7 @@ class SSymbol(Expression):
 
 class SBool(Expression):
     def __init__(self, boolean):
+        super().__init__()
         if(type(boolean) != str):
             raise SError("SBool: input is not a string")
         if(boolean == "#t"):
@@ -48,6 +54,7 @@ class SBool(Expression):
 
 class SVariable(Expression):
     def __init__(self, string):
+        super().__init__()
         if(type(string) != str):
             raise SError("SVariable: not a string")
         self.value = string
@@ -56,10 +63,13 @@ class SVariable(Expression):
         return str(self.value)
     
 class SEmptyList(Expression):
-    pass
+    def __init__(self):
+        super().__init__()
+        pass
 
 class SList(Expression):
     def __init__(self, quotes):
+        super().__init__()
         self.quotes = quotes
     
     def __repr__(self):
@@ -67,6 +77,7 @@ class SList(Expression):
 
 class SDefine(Expression):
     def __init__(self, var, expression):
+        super().__init__()
         if(not isinstance(var, SVariable)):
             raise SError("SDefine: non variable in a define")
         if(not isinstance(expression, Expression)):
@@ -79,6 +90,7 @@ class SDefine(Expression):
 
 class SLet(Expression):
     def __init__(self, var_bindings, body):
+        super().__init__()
         for var_binding in var_bindings:
             if(not isinstance(var_binding[0], SVariable)):
                 raise SError("SLet: non variable in a variable binding")
@@ -91,10 +103,11 @@ class SLet(Expression):
         self.body = body
 
     def __repr__(self):
-        return "(SLet: " + str(self.var_bindings) + " " + str(self.body) + ")"
+        return "(SLet: VarBindings: " + str(self.var_bindings) + " Body: " + str(self.body) + ")"
         
 class SIf(Expression):
     def __init__(self, test, consequent, alternative):
+        super().__init__()
         if(not isinstance(test, Expression)):
             raise SError("SIf: test is not an instance of Expression")
         if(not isinstance(consequent, Expression)):
@@ -110,6 +123,7 @@ class SIf(Expression):
 
 class SProcApplication(Expression):
     def __init__(self, operator, operands):
+        super().__init__()
         if(not isinstance(operator, Expression)):
             raise SError("SProcApplication: operator is not an instance of Expression")
         if(not isinstance(operands, list)):
@@ -126,6 +140,7 @@ class SProcApplication(Expression):
 class SLambda(Expression):
     # Maybe add a check so that we can't add variable list that contains duplicates
     def __init__(self, bound_var_list, body):
+        super().__init__()
         for var in bound_var_list:
             if(not isinstance(var, SVariable)):
                 raise SError("SLambda: bound variable list is not a list of variables")
@@ -140,6 +155,7 @@ class SLambda(Expression):
 
 class SAnd(Expression):
     def __init__(self, expressions):
+        super().__init__()
         for var in expressions:
             if(not isinstance(var, Expression)):
                 raise SError("SAnd: Not all the arguments are exppressions")
@@ -150,6 +166,7 @@ class SAnd(Expression):
 
 class SOr(Expression):
     def __init__(self, expressions):
+        super().__init__()
         for var in expressions:
             if(not isinstance(var, Expression)):
                 raise SError("SOr: Not all the arguments are exppressions")
@@ -160,6 +177,7 @@ class SOr(Expression):
 
 class SSet(Expression):
     def __init__(self, variable, expression):
+        super().__init__()
         if(not isinstance(variable, SVariable)):
             raise SError("SSet: The first argument must be a SVariable")
         if(not isinstance(expression, Expression)):
@@ -172,6 +190,7 @@ class SSet(Expression):
 
 class SBegin(Expression):
     def __init__(self, expressions):
+        super().__init__()
         for var in expressions:
             if(not isinstance(var, Expression)):
                 raise SError("SBegin: Not all the arguments are exppressions")

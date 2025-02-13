@@ -117,6 +117,9 @@ class Interpreter:
     def is_special_form(self, str):
         return str in ["quote", "lambda", "if", "and", "or", "let", "set!", "begin", "define"]
 
+    def is_built_in_func(self, str):
+        return str in ["cons", "car", "cdr", "list", "string?", "pair?", "symbol?", "integer?", "eq?", "equal?", "eqv?"]
+
     def consume_and_process_expressions(self, start, end):
         # consume multiple expression from start till the end, and return the list
         expressions = []
@@ -180,6 +183,8 @@ class Interpreter:
             if(not isinstance(binding, SProcApplication)):
                 self.report(var_bindings_start, "improper let, the let variable bindings should of of form ((<variable> <expression)...)")
             var = binding.operator
+            if(self.is_built_in_func(var)):
+                self.report(var_bindings_start, "improper let, cannot redefine built in functions")
             if(not isinstance(var, SVariable)):
                 self.report(var_bindings_start, "improper let, can only bind expressions to variables")
             exp = binding.operands
@@ -188,16 +193,17 @@ class Interpreter:
             exp = exp[0]
             var_bindings.append((var, exp))
 
-
         # extract the sequence of expressions
-        let_body_start, let_body_end = self.consume_expression(var_bindings_end, end)
-        if(let_body_end == None):
-            self.report(let_body_start, "improper let, should have the let body")
-        if(not self.code[let_body_start] == '('):
-            self.report(let_body_start, "improper let, missing (")
-        expressions = self.consume_and_process_expressions(let_body_start + 1, let_body_end - 1)
+        # let_body_start, let_body_end = self.consume_expression(var_bindings_end, end)
+        # if(let_body_end == None):
+        #     self.report(let_body_start, "improper let, should have the let body")
+        # if(not self.code[let_body_start] == '('):
+        #     self.report(let_body_start, "improper let, missing (")
+        # expressions = self.consume_and_process_expressions(let_body_start + 1, let_body_end - 1)
+
+        expressions = self.consume_and_process_expressions(var_bindings_end, end)
         if(len(expressions) == 0):
-            self.report(let_body_start, "improper let, the body should contain atleast one expression")
+            self.report(var_bindings_end, "improper let, the body should contain atleast one expression")
 
         return SLet(var_bindings, expressions)
 
@@ -277,6 +283,8 @@ class Interpreter:
                 self.report(special_form_end, "improper set, the first argument has to be a variable")
             if(not isinstance(set_expressions[1], Expression)):
                 self.report(special_form_end, "improper set, the second argument has to be a variable")
+            if(self.is_built_in_func(set_expressions[0].value)):
+                self.report(special_form_end, "cannot set the value of a built in function")
             return SSet(set_expressions[0], set_expressions[1])
         # begin is not a special form
         if(special_form == "begin"):
@@ -288,6 +296,8 @@ class Interpreter:
             if(len(define_expressions) != 2):
                 self.report(special_form_end, "define should only have 2 arguments")
             var = define_expressions[0]
+            if(self.is_built_in_func(var)):
+                self.report(special_form_end, "cannot set the value of a built in function")
             if(not isinstance(var, SVariable)):
                 self.report(special_form_end, "first argument to define should be a variable")
             exp = define_expressions[1]
@@ -335,7 +345,6 @@ class Interpreter:
                 # Extract the operator
                 operator_start = first_word_start
                 (x, operator_end) = self.consume_expression(operator_start, end - 1)
-                print(operator_end)
                 if(operator_end == None):
                     self.report(start, "improper procedure application")
                     # This is an expression with nothing in it
@@ -374,7 +383,6 @@ class Interpreter:
                 start += 1
             else:
                 return start
-
 
     # returns (string_expression, end)
     def consume_expression(self, start, until=None):
@@ -421,5 +429,6 @@ if __name__ == "__main__":
     interpreter = Interpreter(code)
     tokens = interpreter.produce_tokens()
     print(tokens)
+    
 
 
