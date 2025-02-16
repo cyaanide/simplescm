@@ -562,7 +562,31 @@ class Compiler():
         list_to_add_to.append("lookup " + str(expression.value))
         if(tail and inside_proc):
             list_to_add_to.append("return")
+    
+    # the arguments are always in non tail position, so here tail should always be false
+    def compile_arguments(self, list_to_add_to, arguments, tail=False, inside_proc=False):
+        if(tail):
+            raise SynError("Tail should always be false when compiling arguments")
+        for arg in arguments[::-1]:
+            self.compile_expression(list_to_add_to, arg, False, False)
+            list_to_add_to.append("push")
         
+    def compile_proc_application(self, list_to_add_to, expression, tail, inside_proc=False):
+        if(not isinstance(expression, SProcApplication)):
+            raise SynError("Not an SProcApplication expression, instead of type: " + str(type(expression)))
+        label = None
+        if(not tail):
+            label = self.generate_jump_label("continuation") 
+            list_to_add_to.append("save_cont " + label)
+            
+        # Evaluate the arguments
+        self.compile_arguments(list_to_add_to, expression.operands, False, False)
+        self.compile_expression(list_to_add_to, expression.operator, False, False)
+        list_to_add_to.append("apply")
+
+        if(not tail):
+            list_to_add_to.append(label)
+
     def compile_expression(self, list_to_add_to,  expression, tail, inside_proc=False):
         if(isinstance(expression, SConstant)):
             self.compile_constant(list_to_add_to, expression, tail, inside_proc)
@@ -572,6 +596,8 @@ class Compiler():
             self.compile_if(list_to_add_to, expression, tail, inside_proc)
         elif(isinstance(expression, SLambda)):
             self.compile_lambda(list_to_add_to, expression, tail, inside_proc)
+        elif(isinstance(expression, SProcApplication)):
+            self.compile_proc_application(list_to_add_to, expression, tail, inside_proc)
                 
     def compile(self):
         for exp in self.ast:
