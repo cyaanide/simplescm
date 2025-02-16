@@ -6,8 +6,10 @@ class Expression:
     def __init__(self):
         self.tail = None
 
+class SConstant(Expression):
+    pass
 
-class SNumber(Expression):
+class SNumber(SConstant):
     def __init__(self, num):
         super().__init__()
         if(type(num) != float):
@@ -17,7 +19,7 @@ class SNumber(Expression):
     def __repr__(self):
         return str(self.value)
 
-class SString(Expression):
+class SString(SConstant):
     def __init__(self, string):
         super().__init__()
         if(type(string) != str):
@@ -27,8 +29,7 @@ class SString(Expression):
     def __repr__(self):
         return str(self.value)
     
-
-class SSymbol(Expression):
+class SSymbol(SConstant):
     def __init__(self, string):
         super().__init__()
         if(type(string) != str):
@@ -38,7 +39,7 @@ class SSymbol(Expression):
     def __repr__(self):
         return "'" + self.value
 
-class SBool(Expression):
+class SBool(SConstant):
     def __init__(self, boolean):
         super().__init__()
         if(type(boolean) != str):
@@ -62,12 +63,12 @@ class SVariable(Expression):
     def __repr__(self):
         return str(self.value)
     
-class SEmptyList(Expression):
+class SEmptyList(SConstant):
     def __init__(self):
         super().__init__()
         pass
 
-class SList(Expression):
+class SConstList(SConstant):
     def __init__(self, quotes):
         super().__init__()
         self.quotes = quotes

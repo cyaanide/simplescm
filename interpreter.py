@@ -8,7 +8,7 @@ class SynError(Exception):
     def __str__(self):
         return f"Error: {self.args[0]}"
 
-class Interpreter:
+class ASTGen:
 
     def __init__(self, code):
         self.code = code
@@ -217,7 +217,7 @@ class Interpreter:
             quotes = []
             while(True):
                 if(exp_start == None):
-                    return SList(quotes)
+                    return SConstList(quotes)
                 if(self.code[exp_start] == '('):
                     # we need to process a list
                     list_obj = self.process_quote(exp_start+1, exp_end-1, process_multiple=True)
@@ -422,13 +422,191 @@ class Interpreter:
     def produce_tokens(self):
         return self.consume_and_process_expressions(0, self.code_len)
 
+class Compiler():
+    def __init__(self, ast):
+        self.ast = ast
+        self.data = []
+        self.defaults = ['bool_false boolean false', 'bool_true boolean true', 'empty_list empty_list']
+        self.label_prefixes = {}
+        self.instructions = []
+        # A list of tuple of (procedure_name, instructions)
+        self.procedures = []
+        self.symbols = set()
+    
+    def generate_label(self, prefix):
+        if(prefix in self.label_prefixes):
+            self.label_prefixes[prefix] += 1
+        else:
+            self.label_prefixes[prefix] = 1
+        return prefix + str(self.label_prefixes[prefix])
+
+    def generate_jump_label(self, prefix):
+        return "_" + self.generate_label(prefix)
+    
+    # just return the list of pre_requisite labels
+    # add the pre_requisie data to self.data yourself
+    def compile_list_constant(self, expression):
+        if(not isinstance(expression, SConstList)):
+            raise SynError(str(expression) + "is not a SConstList")
+        quotes = expression.quotes
+        quote_datas = []
+        quote_labels = []
+        for quote in quotes:
+                (quote_label, quote_data, _) = self.generate_data_instruction_for_constant(quote)
+                quote_labels.append(quote_label)
+                quote_datas.append(quote_data)
+                if(not self.is_default_label(quote_label)):
+                    self.data.append(quote_label + " " + quote_data)
+                    
+        # Append after instead of before, Appending before resutls in a more cleaner and prettier data section
+        # for i in range(len(quote_datas)):
+        #     label = quote_labels[i]
+        #     if(self.is_default_label(label)):
+        #         continue
+        #     self.data.append(quote_labels[i] + " " + quote_datas[i])
+        return quote_labels
+
+    def is_default_label(self, label):
+        if(label.startswith("bool") or label.startswith("empty_list")):
+            return True
+        return False
+            
+    def generate_data_instruction_for_constant(self, expression):
+        if(not isinstance(expression, SConstant)):
+            raise SynError(str(expression) + "is not a SConstant")
+        label = None
+        data = None
+        instruction = None
+        if(isinstance(expression, SNumber)):
+            label = self.generate_label("num")
+            data = "number " + str(expression.value)
+            instruction = ("load_const " + label)
+        elif(isinstance(expression, SString)):
+            label = self.generate_label("str")
+            data = "string " + expression.value
+            instruction = "load_const " + label
+        elif(isinstance(expression, SBool)):
+            label = "bool_false" if expression.value == False else "bool_true"
+            data = "boolean " + str(expression.value)
+            instruction = "load_const " + label
+        elif(isinstance(expression, SString)):
+            label = self.generate_label("str")
+            data = "string " + expression.value
+            instruction = "load_const " + label
+        elif(isinstance(expression, SSymbol)):
+            label = self.generate_label("symbol")
+            data = "symbol " + expression.value
+            instruction = "load_const " + label
+        elif(isinstance(expression, SEmptyList)):
+            label = "empty_list"
+            data = "empty_list"
+            instruction = "load_const " + label
+        elif(isinstance(expression, SConstList)):
+            pre_req_const_labels = self.compile_list_constant(expression)
+            label = self.generate_label("list")
+            data = "list " + str(len(pre_req_const_labels)) + " " +  " ".join(pre_req_const_labels)
+            instruction = "load_const " + label
+        else:
+            raise SynError("Exhausted all possibilites of SConstant, instead is of type " + str(type(expression)))
+
+        if(data and instruction):
+            return (label, data, instruction)
+
+    def compile_constant(self, list_to_add_to,  expression, tail, inside_proc=False):
+        (label, data, instruction) = self.generate_data_instruction_for_constant(expression)
+        list_to_add_to.append(instruction)
+        if(not self.is_default_label(label)):
+            self.data.append(label + " " + data)
+        if(tail and inside_proc):
+            list_to_add_to.append("return")
+        
+    def compile_if(self, list_to_add_to, expression, tail, inside_proc=False):
+        if(not isinstance(expression, SIf)):
+            raise SynError("Not an SIf expression, instead of type: " + str(type(expression)))
+        # Compile the test
+        self.compile_expression(list_to_add_to, expression.test, False, inside_proc)
+        false_branch = self.generate_jump_label("if_false")
+        if_end_branch = self.generate_jump_label("if_end")
+        list_to_add_to.append("if_false_branch " + false_branch)
+        self.compile_expression(list_to_add_to, expression.consequent, tail, inside_proc)
+        list_to_add_to.append("branch " + if_end_branch)
+        list_to_add_to.append(false_branch)
+        self.compile_expression(list_to_add_to, expression.alternative, tail, inside_proc)
+        list_to_add_to.append(if_end_branch)
+        
+    def compile_lambda(self, list_to_add_to, expression, tail, inside_proc=False):
+        ins = []
+        if(not isinstance(expression, SLambda)):
+            raise SynError("Not an SLambda expression, instead of type: " + str(type(expression)))
+        label = self.generate_jump_label("lambda")
+        var_bound_list_str = map(str, expression.bound_var_list)
+        ins.append("bind " + " ".join(var_bound_list_str))
+        self.compile_sequence(ins, expression.body, True, inside_proc=True)
+        list_to_add_to.append("make_closure " + label)
+        if(tail and inside_proc):
+            list_to_add_to.append("return")
+        self.procedures.append((label, ins))
+       
+    def compile_sequence(self, list_to_add_to, sequence, tail, inside_proc=False):
+        len_sequence = len(sequence)
+        # Compile all the first n-1 in non tail position
+        for i in range(len_sequence - 1):
+            self.compile_expression(list_to_add_to, sequence[i], False, inside_proc)
+        # Compile the last one according to the argument given
+        if(len_sequence != 0):
+            self.compile_expression(list_to_add_to, sequence[len_sequence - 1], tail, inside_proc)
+    
+    def compile_variable(self, list_to_add_to, expression, tail, inside_proc=False):
+        if(not isinstance(expression, SVariable)):
+            raise SynError("Not an SVariable expression, instead of type: " + str(type(expression)))
+        list_to_add_to.append("lookup " + str(expression.value))
+        if(tail and inside_proc):
+            list_to_add_to.append("return")
+        
+    def compile_expression(self, list_to_add_to,  expression, tail, inside_proc=False):
+        if(isinstance(expression, SConstant)):
+            self.compile_constant(list_to_add_to, expression, tail, inside_proc)
+        elif(isinstance(expression, SVariable)):
+            self.compile_variable(list_to_add_to, expression, tail, inside_proc)
+        elif(isinstance(expression, SIf)):
+            self.compile_if(list_to_add_to, expression, tail, inside_proc)
+        elif(isinstance(expression, SLambda)):
+            self.compile_lambda(list_to_add_to, expression, tail, inside_proc)
+                
+    def compile(self):
+        for exp in self.ast:
+            # All top level expressions are always in non tail position
+            self.compile_expression(self.instructions, exp, False)
+        self.instructions.append("exit")
+        print(self.procedures)
+    
+    def generate_assembly(self):
+        output = ""
+        output += ".defaults_start\n"
+        output += "\n".join(self.defaults)
+        output += "\n.defaults_end\n\n"
+        output += ".data_start\n"
+        output += "\n".join(self.data)
+        output += "\n.data_end\n\n"
+        output += "\n".join(self.instructions)
+        output += "\n\n"
+        for proc in self.procedures:
+            output += proc[0] + "\n"
+            output += "\n".join(proc[1])
+            output += "\n\n"
+        return output
+                                                                                                                
 if __name__ == "__main__":
     filename = sys.argv[1]
     with open(filename) as file_name:
         code = file_name.read()
-    interpreter = Interpreter(code)
-    tokens = interpreter.produce_tokens()
-    print(tokens)
+    ast_generator = ASTGen(code)
+    tokens = ast_generator.produce_tokens()
+    compiler = Compiler(tokens)
+    compiler.compile()
+    output = compiler.generate_assembly()
+    print(output, end='')
+
     
 
 
