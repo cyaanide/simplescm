@@ -82,6 +82,16 @@ class ASTGen:
             else:
                 return start
 
+    def consume_word_from_without_error(self, start, until=None):
+        eof = self.code_len if until == None else until
+        while(True):
+            if(start >= eof):
+                return start
+            if(not self.code[start].isspace()):
+                start += 1
+            else:
+                return start
+
     def consume_var_from(self, start, until=None):
         eof = self.code_len if until == None else until
         if(start >= eof):
@@ -334,7 +344,7 @@ class ASTGen:
             if(first_word_start == end):
                 raise SynError("Error at character " + str(start) + ", Empty parenthesis")
             # We know this expression contains something, extract the first word
-            first_word_end = self.consume_word_from(first_word_start, end - 1)
+            first_word_end = self.consume_word_from_without_error(first_word_start, end - 1)
             # Check to see if this word is a special form
             is_special_form = self.is_special_form(self.code[first_word_start: first_word_end])
             if(is_special_form):
@@ -512,66 +522,66 @@ class Compiler():
         if(data and instruction):
             return (label, data, instruction)
 
-    def compile_constant(self, list_to_add_to,  expression, tail, inside_proc=False):
+    def compile_constant(self, list_to_add_to,  expression, tail):
         (label, data, instruction) = self.generate_data_instruction_for_constant(expression)
         list_to_add_to.append(instruction)
         if(not self.is_default_label(label)):
             self.data.append(label + " " + data)
-        if(tail and inside_proc):
+        if(tail):
             list_to_add_to.append("return")
         
-    def compile_if(self, list_to_add_to, expression, tail, inside_proc=False):
+    def compile_if(self, list_to_add_to, expression, tail):
         if(not isinstance(expression, SIf)):
             raise SynError("Not an SIf expression, instead of type: " + str(type(expression)))
         # Compile the test
-        self.compile_expression(list_to_add_to, expression.test, False, inside_proc)
+        self.compile_expression(list_to_add_to, expression.test, False)
         false_branch = self.generate_jump_label("if_false")
         if_end_branch = self.generate_jump_label("if_end")
         list_to_add_to.append("if_false_branch " + false_branch)
-        self.compile_expression(list_to_add_to, expression.consequent, tail, inside_proc)
+        self.compile_expression(list_to_add_to, expression.consequent, tail)
         list_to_add_to.append("branch " + if_end_branch)
         list_to_add_to.append(false_branch)
-        self.compile_expression(list_to_add_to, expression.alternative, tail, inside_proc)
+        self.compile_expression(list_to_add_to, expression.alternative, tail)
         list_to_add_to.append(if_end_branch)
         
-    def compile_lambda(self, list_to_add_to, expression, tail, inside_proc=False):
+    def compile_lambda(self, list_to_add_to, expression, tail):
         ins = []
         if(not isinstance(expression, SLambda)):
             raise SynError("Not an SLambda expression, instead of type: " + str(type(expression)))
         label = self.generate_jump_label("lambda")
         var_bound_list_str = map(str, expression.bound_var_list)
         ins.append("bind " + " ".join(var_bound_list_str))
-        self.compile_sequence(ins, expression.body, True, inside_proc=True)
+        self.compile_sequence(ins, expression.body, True)
         list_to_add_to.append("make_closure " + label)
-        if(tail and inside_proc):
+        if(tail):
             list_to_add_to.append("return")
         self.procedures.append((label, ins))
        
-    def compile_sequence(self, list_to_add_to, sequence, tail, inside_proc=False):
+    def compile_sequence(self, list_to_add_to, sequence, tail):
         len_sequence = len(sequence)
         # Compile all the first n-1 in non tail position
         for i in range(len_sequence - 1):
-            self.compile_expression(list_to_add_to, sequence[i], False, inside_proc)
+            self.compile_expression(list_to_add_to, sequence[i], False)
         # Compile the last one according to the argument given
         if(len_sequence != 0):
-            self.compile_expression(list_to_add_to, sequence[len_sequence - 1], tail, inside_proc)
+            self.compile_expression(list_to_add_to, sequence[len_sequence - 1], tail)
     
-    def compile_variable(self, list_to_add_to, expression, tail, inside_proc=False):
+    def compile_variable(self, list_to_add_to, expression, tail):
         if(not isinstance(expression, SVariable)):
             raise SynError("Not an SVariable expression, instead of type: " + str(type(expression)))
         list_to_add_to.append("lookup " + str(expression.value))
-        if(tail and inside_proc):
+        if(tail):
             list_to_add_to.append("return")
     
     # the arguments are always in non tail position, so here tail should always be false
-    def compile_arguments(self, list_to_add_to, arguments, tail=False, inside_proc=False):
+    def compile_arguments(self, list_to_add_to, arguments, tail=False):
         if(tail):
             raise SynError("Tail should always be false when compiling arguments")
         for arg in arguments[::-1]:
-            self.compile_expression(list_to_add_to, arg, False, False)
+            self.compile_expression(list_to_add_to, arg, False)
             list_to_add_to.append("push")
         
-    def compile_proc_application(self, list_to_add_to, expression, tail, inside_proc=False):
+    def compile_proc_application(self, list_to_add_to, expression, tail):
         if(not isinstance(expression, SProcApplication)):
             raise SynError("Not an SProcApplication expression, instead of type: " + str(type(expression)))
         label = None
@@ -580,31 +590,112 @@ class Compiler():
             list_to_add_to.append("save_cont " + label)
             
         # Evaluate the arguments
-        self.compile_arguments(list_to_add_to, expression.operands, False, False)
-        self.compile_expression(list_to_add_to, expression.operator, False, False)
+        self.compile_arguments(list_to_add_to, expression.operands, False)
+        self.compile_expression(list_to_add_to, expression.operator, False)
         list_to_add_to.append("apply")
 
         if(not tail):
             list_to_add_to.append(label)
+            
+    # Defines are only allowed to be top level
+    def compile_define(self, list_to_add_to, expression, tail):
+        # Define should always be a top level expression
+        if(tail):
+            raise SynError("Define in tail posisiton, not allowed")
+        if(not isinstance(expression, SDefine)):
+            raise SynError("Expression is not of type SDefine, instead is of type " + str(type(expression)))
+        self.compile_expression(list_to_add_to, expression.expression, False)
+        list_to_add_to.append("define " + str(expression.var))
 
-    def compile_expression(self, list_to_add_to,  expression, tail, inside_proc=False):
+    # Set is allowed to be anywhere it wants to be, the result of the set expression will be the new value of the computed argument
+    def compile_set(self, list_to_add_to, expression, tail):
+        if(not isinstance(expression, SSet)):
+            raise SynError("Expression is not of type SSet, instead is of type " + str(type(expression)))
+        # Compute the argument to set in non tail position
+        self.compile_expression(list_to_add_to, expression.expression, False)
+        list_to_add_to.append("set " + str(expression.variable))
+        if(tail):
+            list_to_add_to.append("return")
+    
+    def compile_and(self, list_to_add_to, expression, tail):
+        if(not isinstance(expression, SAnd)):
+            raise SynError("Expression is not of type SAnd, instead is of type " + str(type(expression)))
+        and_false = self.generate_jump_label("and_false")
+        and_end = self.generate_jump_label("and_end")
+        for exp in expression.expressions:
+            self.compile_expression(list_to_add_to, exp, False)
+            list_to_add_to.append("if_false_branch " + and_false)
+        list_to_add_to.append("lookup bool_true")
+        if(tail):
+            list_to_add_to.append("return")
+        list_to_add_to.append("jump " + and_end)
+        list_to_add_to.append(and_false)
+        list_to_add_to.append("lookup bool_false")
+        if(tail):
+            list_to_add_to.append("return")
+        list_to_add_to.append(and_end)
+            
+    def compile_or(self, list_to_add_to, expression, tail):
+        if(not isinstance(expression, SOr)):
+            raise SynError("Expression is not of type SOr, instead is of type " + str(type(expression)))
+        or_true = self.generate_jump_label("or_true")
+        or_end = self.generate_jump_label("or_end")
+        for exp in expression.expressions:
+            self.compile_expression(list_to_add_to, exp, False)
+            list_to_add_to.append("if_true_branch " + or_true)
+        list_to_add_to.append("lookup bool_false")
+        if(tail):
+            list_to_add_to.append("return")
+        list_to_add_to.append("jump " + or_end)
+        list_to_add_to.append(or_true)
+        list_to_add_to.append("lookup bool_true")
+        if(tail):
+            list_to_add_to.append("return")
+        list_to_add_to.append(or_end)
+        
+    def compile_let(self, list_to_add_to, expression, tail):
+        if(not isinstance(expression, SLet)):
+            raise SynError("Expression is not of type SLet, instead is of type " + str(type(expression)))
+        bindings = [x[1] for x in expression.var_bindings]
+        vars = [x[0] for x in expression.var_bindings]
+        vars = map(str, vars)
+        self.compile_arguments(list_to_add_to, bindings, False)
+        list_to_add_to.append("bind " + " ".join(vars))
+        self.compile_sequence(list_to_add_to, expression.body, tail)
+        
+
+    def compile_expression(self, list_to_add_to,  expression, tail):
         if(isinstance(expression, SConstant)):
-            self.compile_constant(list_to_add_to, expression, tail, inside_proc)
+            self.compile_constant(list_to_add_to, expression, tail)
         elif(isinstance(expression, SVariable)):
-            self.compile_variable(list_to_add_to, expression, tail, inside_proc)
+            self.compile_variable(list_to_add_to, expression, tail)
         elif(isinstance(expression, SIf)):
-            self.compile_if(list_to_add_to, expression, tail, inside_proc)
+            self.compile_if(list_to_add_to, expression, tail)
         elif(isinstance(expression, SLambda)):
-            self.compile_lambda(list_to_add_to, expression, tail, inside_proc)
+            self.compile_lambda(list_to_add_to, expression, tail)
         elif(isinstance(expression, SProcApplication)):
-            self.compile_proc_application(list_to_add_to, expression, tail, inside_proc)
+            self.compile_proc_application(list_to_add_to, expression, tail)
+        elif(isinstance(expression, SDefine)):
+            self.compile_define(list_to_add_to, expression, tail)
+        elif(isinstance(expression, SSet)):
+            self.compile_set(list_to_add_to, expression, tail)
+        elif(isinstance(expression, SAnd)):
+            self.compile_and(list_to_add_to, expression, tail)
+        elif(isinstance(expression, SOr)):
+            self.compile_or(list_to_add_to, expression, tail)
+        elif(isinstance(expression, SBegin)):
+            self.compile_sequence(list_to_add_to, expression.expressions, tail)
+        elif(isinstance(expression, SLet)):
+            self.compile_let(list_to_add_to, expression, tail)
+        else:
+            raise SynError("Reached the end of expression case switch, unknown expression of type " + str(type(expression)))
+        
                 
     def compile(self):
         for exp in self.ast:
             # All top level expressions are always in non tail position
             self.compile_expression(self.instructions, exp, False)
         self.instructions.append("exit")
-        print(self.procedures)
     
     def generate_assembly(self):
         output = ""
