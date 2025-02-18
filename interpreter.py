@@ -141,7 +141,6 @@ class ASTGen:
             (expression_start, expression_end) = self.consume_expression(start, end)
         return expressions
 
-            
     def dispach_lambda(self, start, end):
         (variables_start, variables_end) = self.consume_expression(start, end)
         if(variables_end == None):
@@ -315,15 +314,12 @@ class ASTGen:
                 self.report(special_form_end, "second arguemnt to define should be a scheme expression")
             return SDefine(var, exp)
         
-        
-    
     # start is the ( and end is the character after )
     # When string sliced, this procedure can see the string it is trying to process
     def process_expression(self, start, end):
         # print("processing expression: " + self.code[start:end])
         c = self.code[start]
-        # Number
-        if(c.isnumeric()):
+        if(self.is_numeric(start, end)):
             # Create something of type number and then return it
             return SNumber(float(self.code[start:end]))
         # String
@@ -394,6 +390,20 @@ class ASTGen:
             else:
                 return start
 
+    def is_numeric(self, start, until=None):
+        eof = self.code_len if until == None else until
+        c = self.code[start]
+        if(c.isnumeric()):
+            return True
+        elif(c == "-"):
+            if(start+1 >= eof):
+                return False
+            elif(self.code[start+1].isnumeric()):
+                return True
+            else:
+                return False
+
+        
     # returns (string_expression, end)
     def consume_expression(self, start, until=None):
         # As each type of expression needs to deal with EOF in their own way, let's check for EOF only once here
@@ -405,7 +415,7 @@ class ASTGen:
         c = self.code[start]
 
         # Number
-        if(c.isnumeric()):
+        if(self.is_numeric(start, until)):
             end = self.consume_number_from(start, until)
             return (start, end)
         # String
@@ -663,7 +673,6 @@ class Compiler():
         list_to_add_to.append("bind " + " ".join(vars))
         self.compile_sequence(list_to_add_to, expression.body, tail)
         
-
     def compile_expression(self, list_to_add_to,  expression, tail):
         if(isinstance(expression, SConstant)):
             self.compile_constant(list_to_add_to, expression, tail)
@@ -690,7 +699,6 @@ class Compiler():
         else:
             raise SynError("Reached the end of expression case switch, unknown expression of type " + str(type(expression)))
         
-                
     def compile(self):
         for exp in self.ast:
             # All top level expressions are always in non tail position
