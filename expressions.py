@@ -69,12 +69,12 @@ class SEmptyList(SConstant):
         pass
 
 class SConstList(SConstant):
-    def __init__(self, quotes):
+    def __init__(self, consts):
         super().__init__()
-        self.quotes = quotes
+        self.consts = consts
     
     def __repr__(self):
-        return "(SList: " + str(self.quotes) + ")"
+        return "(SList: " + str(self.consts) + ")"
 
 class SDefine(Expression):
     def __init__(self, var, expression):

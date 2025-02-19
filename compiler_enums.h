@@ -1,15 +1,14 @@
 #include <cstdint>
 
-enum OpCodes : std::uint8_t
+enum OpCodes: std::uint8_t
 {
-    // Opp code instructions
     opp_null = 0,
     lookup = 1,
     load_const = 2,
     bind = 3,
     apply = 4,
     ret = 5,
-    save_cont = 6,
+    save_continuation = 6,
     if_false_branch = 7,
     if_true_branch = 8,
     branch = 9,
@@ -18,14 +17,23 @@ enum OpCodes : std::uint8_t
     set = 12,
     define = 13,
     ext = 14,
-
-    // Opp codes for types of constants
     defaults_start = 15,
     defaults_end = 16,
-    boolean = 17,
-    string = 18,
-    number = 19,
-    list = 20,
-    symbol = 21,
-    label = 22,
+    label = 17,
+};
+
+enum Types: std::uint8_t
+{
+    boolean = 1,
+    string = 2,
+    number = 3,
+    list = 4,
+    symbol = 5,
+};
+
+enum Defaults: std::uint8_t
+{
+    boolean_false = 1,
+    boolean_true = 2,
+    empty_list = 3,
 };
