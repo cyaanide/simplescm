@@ -446,21 +446,14 @@ class ASTGen:
 class Compiler():
     def __init__(self, ast):
         self.ast = ast
-        self.data = []
-        self.label_prefixes = {}
+        # A list of tuples (uid, (Type, [vals,]))
+        self.constants = []
+        # A list of tuples (Opp, Input)
         self.instructions = []
-        # A list of tuple of (procedure_name, instructions)
+        # A list of tuple of (procedure_id, instructions)
         self.procedures = []
-        self.symbols = set()
         # Reserve some initial cuid's, this way I can directly use them 
         self.cur_uid = len(Defaults)
-    
-    def generate_label(self, prefix):
-        if(prefix in self.label_prefixes):
-            self.label_prefixes[prefix] += 1
-        else:
-            self.label_prefixes[prefix] = 1
-        return prefix + str(self.label_prefixes[prefix])
     
     def generate_uid(self):
         self.cur_uid += 1
@@ -470,7 +463,6 @@ class Compiler():
         return isinstance(exp, Defaults)
 
     # just return the list of pre_requisite labels
-    # add the pre_requisie data to self.data yourself
     def compile_list_constant(self, expression):
         if(not isinstance(expression, SConstList)):
             raise SynError(str(expression) + "is not a SConstList")
@@ -480,7 +472,7 @@ class Compiler():
                 (exp_uid, exp_data, _) = self.generate_data_instruction_for_constant(exp)
                 consts_uids.append(exp_uid)
                 if(not self.is_type_default(exp_data[0])):
-                    self.data.append((exp_uid, exp_data))
+                    self.constants.append((exp_uid, exp_data))
                     
         return consts_uids
 
@@ -545,13 +537,10 @@ class Compiler():
             return (uid, data, instruction)
 
     def compile_constant(self, list_to_add_to,  expression, tail):
-        # (label, data, instruction) = self.generate_data_instruction_for_constant(expression)
         (uid, data, instruction) = self.generate_data_instruction_for_constant(expression)
         list_to_add_to.append(instruction)
-        # if(not isinstance(data, Defaults)):
-        #     self.data.append((uid, data))
         if(not self.is_type_default(data[0])):
-            self.data.append((uid, data))
+            self.constants.append((uid, data))
         if(tail):
             list_to_add_to.append((OppCodes.ret, None))
         
@@ -560,8 +549,6 @@ class Compiler():
             raise SynError("Not an SIf expression, instead of type: " + str(type(expression)))
         # Compile the test
         self.compile_expression(list_to_add_to, expression.test, False)
-        # false_branch = self.generate_jump_label("if_false")
-        # if_end_branch = self.generate_jump_label("if_end")
         false_branch_uid = self.generate_uid()
         if_end_branch_uid = self.generate_uid()
 
@@ -576,37 +563,29 @@ class Compiler():
         ins = []
         if(not isinstance(expression, SLambda)):
             raise SynError("Not an SLambda expression, instead of type: " + str(type(expression)))
-        # label = self.generate_jump_label("lambda")
         uid = self.generate_uid()
         var_bound_list_str = list(map(str, expression.bound_var_list))
-        # ins.append("bind " + " ".join(var_bound_list_str))
         ins.append((OppCodes.bind, var_bound_list_str))
         self.compile_sequence(ins, expression.body, True)
-        # list_to_add_to.append("make_closure " + label)
         list_to_add_to.append((OppCodes.make_closure, uid))
         if(tail):
-            # list_to_add_to.append("return")
             list_to_add_to.append((OppCodes.ret, None))
         self.procedures.append((uid, ins))
        
     def compile_sequence(self, list_to_add_to, sequence, tail):
         len_sequence = len(sequence)
-        # Compile all the first n-1 in non tail position
         for i in range(len_sequence - 1):
             self.compile_expression(list_to_add_to, sequence[i], False)
-        # Compile the last one according to the argument given
         if(len_sequence != 0):
             self.compile_expression(list_to_add_to, sequence[len_sequence - 1], tail)
     
     def compile_variable(self, list_to_add_to, expression, tail):
         if(not isinstance(expression, SVariable)):
             raise SynError("Not an SVariable expression, instead of type: " + str(type(expression)))
-        # list_to_add_to.append("lookup " + str(expression.value))
         list_to_add_to.append((OppCodes.lookup, expression.value))
         if(tail):
             list_to_add_to.append((OppCodes.ret, None))
     
-    # the arguments are always in non tail position, so here tail should always be false
     def compile_arguments(self, list_to_add_to, arguments, tail=False):
         if(tail):
             raise SynError("Tail should always be false when compiling arguments")
@@ -619,19 +598,15 @@ class Compiler():
             raise SynError("Not an SProcApplication expression, instead of type: " + str(type(expression)))
         uid = None
         if(not tail):
-            # label = self.generate_jump_label("continuation") 
-            # list_to_add_to.append("save_cont " + label)
             uid = self.generate_uid()
             list_to_add_to.append((OppCodes.save_continuation, uid))
             
         # Evaluate the arguments
         self.compile_arguments(list_to_add_to, expression.operands, False)
         self.compile_expression(list_to_add_to, expression.operator, False)
-        # list_to_add_to.append("apply")
         list_to_add_to.append((OppCodes.apply, None))
 
         if(not tail):
-            # list_to_add_to.append(label)
             list_to_add_to.append((OppCodes.label, uid))
             
     # Defines are only allowed to be top level
@@ -650,7 +625,6 @@ class Compiler():
             raise SynError("Expression is not of type SSet, instead is of type " + str(type(expression)))
         # Compute the argument to set in non tail position
         self.compile_expression(list_to_add_to, expression.expression, False)
-        # list_to_add_to.append("set " + str(expression.variable))
         list_to_add_to.append((OppCodes.set, expression.variable))
         if(tail):
             list_to_add_to.append("return")
@@ -658,59 +632,39 @@ class Compiler():
     def compile_and(self, list_to_add_to, expression, tail):
         if(not isinstance(expression, SAnd)):
             raise SynError("Expression is not of type SAnd, instead is of type " + str(type(expression)))
-        # and_false = self.generate_jump_label("and_false")
         and_false_uid = self.generate_uid()
-        # and_end = self.generate_jump_label("and_end")
         and_end_uid = self.generate_uid()
         for exp in expression.expressions:
             self.compile_expression(list_to_add_to, exp, False)
-            # list_to_add_to.append("if_false_branch " + and_false)
             list_to_add_to.append((OppCodes.if_false_branch, and_false_uid))
-        # list_to_add_to.append("lookup bool_true")
         list_to_add_to.append((OppCodes.load_const, Defaults.boolean_true.value))
         if(tail):
-            # list_to_add_to.append("return")
             list_to_add_to.append((OppCodes.ret, None))
-        # list_to_add_to.append("jump " + and_end)
         list_to_add_to.append((OppCodes.branch, and_end_uid))
-        # list_to_add_to.append(and_false)
         list_to_add_to.append((OppCodes.label, and_false_uid))
-        # list_to_add_to.append("lookup bool_false")
         list_to_add_to.append((OppCodes.load_const, Defaults.boolean_false.value))
 
         if(tail):
-            # list_to_add_to.append("return")
             list_to_add_to.append((OppCodes.ret, None))
-        # list_to_add_to.append(and_end)
         list_to_add_to.append((OppCodes.label, and_end_uid))
             
     def compile_or(self, list_to_add_to, expression, tail):
         if(not isinstance(expression, SOr)):
             raise SynError("Expression is not of type SOr, instead is of type " + str(type(expression)))
-        # or_true = self.generate_jump_label("or_true")
         or_true_uid = self.generate_uid()
-        # or_end = self.generate_jump_label("or_end")
         or_end_uid = self.generate_uid()
 
         for exp in expression.expressions:
             self.compile_expression(list_to_add_to, exp, False)
-            # list_to_add_to.append("if_true_branch " + or_true)
             list_to_add_to.append((OppCodes.if_true_branch, or_true_uid))
-        # list_to_add_to.append("lookup bool_false")
         list_to_add_to.append((OppCodes.load_const, Defaults.boolean_false.value))
         if(tail):
-            # list_to_add_to.append("return")
             list_to_add_to.append((OppCodes.ret, None))
-        # list_to_add_to.append("jump " + or_end)
         list_to_add_to.append((OppCodes.branch, or_end_uid))
-        # list_to_add_to.append(or_true)
         list_to_add_to.append((OppCodes.label, or_true_uid))
-        # list_to_add_to.append("lookup bool_true")
         list_to_add_to.append((OppCodes.load_const, Defaults.boolean_true.value))
         if(tail):
-            # list_to_add_to.append("return")
             list_to_add_to.append((OppCodes.ret, None))
-        # list_to_add_to.append(or_end)
         list_to_add_to.append((OppCodes.label, or_end_uid))
         
     def compile_let(self, list_to_add_to, expression, tail):
@@ -720,7 +674,6 @@ class Compiler():
         vars = [x[0] for x in expression.var_bindings]
         vars = list(map(str, vars))
         self.compile_arguments(list_to_add_to, bindings, False)
-        # list_to_add_to.append("bind " + " ".join(vars))
         list_to_add_to.append((OppCodes.bind, vars))
         self.compile_sequence(list_to_add_to, expression.body, tail)
         
@@ -755,6 +708,7 @@ class Compiler():
             # All top level expressions are always in non tail position
             self.compile_expression(self.instructions, exp, False)
         self.instructions.append((OppCodes.ext, None))
+        return(self.constants, self.instructions, self.procedures)
     
     def generate_human_readable(self):
         def print_ins(instructions):
@@ -770,7 +724,7 @@ class Compiler():
         output+=  ".defaults_end\n\n"
         
         output += ".data_start\n"
-        for dat in self.data:
+        for dat in self.constants:
             output += "uid: " + str(dat[0]) + " type: " + dat[1][0].name
             output += " val(s): " + str(dat[1][1])
             output += "\n"
@@ -794,7 +748,8 @@ if __name__ == "__main__":
     ast_generator = ASTGen(code)
     tokens = ast_generator.produce_tokens()
     compiler = Compiler(tokens)
-    compiler.compile()
+    (data, instructions, procedure) = compiler.compile()
+    print(data)
     output = compiler.generate_human_readable()
     print(output, end='')
 
