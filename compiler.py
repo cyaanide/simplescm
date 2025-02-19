@@ -749,7 +749,6 @@ if __name__ == "__main__":
     tokens = ast_generator.produce_tokens()
     compiler = Compiler(tokens)
     (data, instructions, procedure) = compiler.compile()
-    print(data)
     output = compiler.generate_human_readable()
     print(output, end='')
 
