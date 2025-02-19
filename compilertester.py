@@ -1,4 +1,4 @@
-from interpreter import Interpreter
+from compiler import Interpreter
 
 class InterpreterTester():
     def test_token_production(self):

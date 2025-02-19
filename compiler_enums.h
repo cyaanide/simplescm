@@ -17,8 +17,8 @@ enum OpCodes: std::uint8_t
     set = 12,
     define = 13,
     ext = 14,
-    defaults_start = 15,
-    defaults_end = 16,
+    data_start = 15,
+    data_end = 16,
     label = 17,
 };
 
