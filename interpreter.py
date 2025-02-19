@@ -1,5 +1,6 @@
 import sys
 from expressions import *
+from oppcodes import OppCodes
 
 class SynError(Exception):
     def __init__(self, message):
@@ -446,7 +447,6 @@ class Compiler():
     def __init__(self, ast):
         self.ast = ast
         self.data = []
-        self.defaults = ['bool_false boolean false', 'bool_true boolean true', 'empty_list empty_list']
         self.label_prefixes = {}
         self.instructions = []
         # A list of tuple of (procedure_name, instructions)
@@ -707,9 +707,6 @@ class Compiler():
     
     def generate_assembly(self):
         output = ""
-        output += ".defaults_start\n"
-        output += "\n".join(self.defaults)
-        output += "\n.defaults_end\n\n"
         output += ".data_start\n"
         output += "\n".join(self.data)
         output += "\n.data_end\n\n"
