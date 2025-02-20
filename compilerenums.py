@@ -21,6 +21,7 @@ class OppCodes(Enum):
     data_start = 15
     data_end = 16
     label = 17
+    proc_end = 18
 
 class Types(Enum):
     # Opp codes for types of constants

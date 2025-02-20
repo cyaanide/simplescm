@@ -131,6 +131,7 @@ class Compiler():
         var_bound_list_str = list(map(str, expression.bound_var_list))
         ins.append((OppCodes.bind, var_bound_list_str))
         self.compile_sequence(ins, expression.body, True)
+        ins.append((OppCodes.proc_end, None))
         list_to_add_to.append((OppCodes.make_closure, uid))
         if(tail):
             list_to_add_to.append((OppCodes.ret, None))
@@ -307,6 +308,10 @@ class Compiler():
                                                                                                                 
 
 if __name__ == "__main__":
+    def pretty_print_hex(body):
+        for ins in body:
+            print(", ".join(hex(b) for b in ins))
+
     filename = sys.argv[1]
     with open(filename) as file_name:
         code = file_name.read()
@@ -318,6 +323,17 @@ if __name__ == "__main__":
     print(output, end='')
     assembler = Assembler(data, instructions, procedure)
     assembler.assemble_constants()
+    (body, to_replace, label_loc, proc_locs) = assembler.assemble_body(instructions)
+    pretty_print_hex(body=body)
+    print(to_replace)
+    print(label_loc)
+    print(proc_locs)
+    (body, to_replace, label_loc, proc_locs) = assembler.assemble_body(procedure[0][1])
+    pretty_print_hex(body=body)
+    print(to_replace)
+    print(label_loc)
+    print(proc_locs)
+
 
     
 

@@ -20,6 +20,7 @@ enum OpCodes: std::uint8_t
     data_start = 15,
     data_end = 16,
     label = 17,
+    proc_end = 18,
 };
 
 enum Types: std::uint8_t
