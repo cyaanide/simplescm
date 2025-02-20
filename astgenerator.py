@@ -438,5 +438,5 @@ class ASTGenerator:
             end = self.consume_word_from(start, until)
             return (start, end)
     
-    def produce_tokens(self):
+    def generate_ast(self):
         return self.consume_and_process_expressions(0, self.code_len)

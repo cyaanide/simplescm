@@ -6,10 +6,11 @@ class AssemblerError(SyntaxError):
 
 class Assembler():
 
-    def __init__(self, constants, main_body, procedures):
+    def __init__(self, constants, main, procedures):
         self.constants = constants
-        self.main_body = main_body
+        self.main = main
         self.procedures = procedures
+        self.assembled = []
         
     def enum_to_byte(self, oppcode):
         return bytearray(oppcode.value.to_bytes(1))
@@ -182,14 +183,16 @@ class Assembler():
         return (output, lines_that_need_label, label_locations, lines_that_need_lambda)
     
     
-    def pretty_print(self, bodies):
+    def debug_output(self):
+        output = ""
         cur = 0
-        for body in bodies:
+        for body in self.assembled:
             for ins in body:
-                print(hex(cur).ljust(6), end="| ")
-                print(", ".join(hex(b) for b in ins))
+                output += hex(cur).ljust(6) + "| "
+                output += ", ".join(hex(b) for b in ins) + "\n"
                 cur += len(ins)
-            print("----------")
+            output += "------------\n"
+        return output
     
     def sub_in_labels(self, assembled_body, label_replacement, label_location, offset):
         for label_uid in label_location:
@@ -209,7 +212,7 @@ class Assembler():
         assembled_consts = self.assemble_constants()
         bodies.append(assembled_consts)
         
-        (main_assembled, lines_in_main_that_need_label, label_locations, lines_in_main_that_need_lambda) = self.assemble_body(self.main_body)
+        (main_assembled, lines_in_main_that_need_label, label_locations, lines_in_main_that_need_lambda) = self.assemble_body(self.main)
         bytes_so_far = self.no_of_bytes_in_list_body(bodies)
         self.sub_in_labels(main_assembled, lines_in_main_that_need_label, label_locations, bytes_so_far)
         for lambda_id in lines_in_main_that_need_lambda:
@@ -237,5 +240,9 @@ class Assembler():
             lambda_pos = self.no_of_bytes_in_list_body(bodies[:lambda_pos_in_bodies])
             bodies[body_index][line_in_body][1:5] = self.uid_to_4_bytes(lambda_pos)
 
-        self.pretty_print(bodies)
-
+        self.assembled = bodies
+        final_and = bytearray()
+        for body in bodies:
+            for line in body:
+                final_and += line
+        return final_and

@@ -1,10 +1,8 @@
 import sys
 from expressions import *
 from compilerenums import *
-from assembler import *
 from astgenerator import *
-
-
+from assembler import *
 
 
 class Compiler():
@@ -275,7 +273,7 @@ class Compiler():
         self.instructions.append((OppCodes.ext, None))
         return(self.constants, self.instructions, self.procedures)
     
-    def generate_human_readable(self):
+    def debug_output(self):
         def print_ins(instructions):
             output = ""
             for ins in instructions:
@@ -302,27 +300,24 @@ class Compiler():
             output += "lambda " + str(proc[0]) + "\n"
             output += print_ins(proc[1])
             output += "\n"
-        output += "\n"
 
         return output
                                                                                                                 
 
 if __name__ == "__main__":
-    def pretty_print_hex(body):
-        for ins in body:
-            print(", ".join(hex(b) for b in ins))
-
     filename = sys.argv[1]
     with open(filename) as file_name:
         code = file_name.read()
     ast_generator = ASTGenerator(code)
-    tokens = ast_generator.produce_tokens()
-    compiler = Compiler(tokens)
-    (data, instructions, procedure) = compiler.compile()
-    output = compiler.generate_human_readable()
-    print(output, end='')
-    assembler = Assembler(data, instructions, procedure)
-    assembler.assemble()
+    ast = ast_generator.generate_ast()
+
+    compiler = Compiler(ast)
+    (constants, main, procedures) = compiler.compile()
+    print(compiler.debug_output(), end="")
+
+    assembler = Assembler(constants, main, procedures)
+    assembled = assembler.assemble()
+    print(assembler.debug_output(), end="")
 
 
     
