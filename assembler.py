@@ -6,11 +6,10 @@ class AssemblerError(SyntaxError):
 
 class Assembler():
 
-    def __init__(self, constants, instructions, procedures):
+    def __init__(self, constants, main_body, procedures):
         self.constants = constants
-        self.instructions = instructions
-        self.procedure = procedures
-        self.output = []
+        self.main_body = main_body
+        self.procedures = procedures
         
     def enum_to_byte(self, oppcode):
         return bytearray(oppcode.value.to_bytes(1))
@@ -55,27 +54,30 @@ class Assembler():
             raise str(type(typ)) + " can't be processed in assemble_constant"
     
     def assemble_constants(self):
-        self.output.append(self.enum_to_byte(OppCodes.data_start))
+        output = []
+        output.append(self.enum_to_byte(OppCodes.data_start))
         for const in self.constants:
-            self.output.append(self.assemble_constant(const))
-        self.output.append(self.enum_to_byte(OppCodes.data_end))
+            output.append(self.assemble_constant(const))
+        output.append(self.enum_to_byte(OppCodes.data_end))
+        return output
         
-    def no_of_bytes(self, lst):
+    def no_of_bytes_in_a_body(self, lst):
         return sum(map(len, lst))
+    def no_of_bytes_in_list_body(self, lst_bodies):
+        return sum(map(self.no_of_bytes_in_a_body, lst_bodies))
     
     # Return a null terminated string in bytearray
     def string_to_byes(self, str):
         return bytearray(str, "ascii") + bytearray(1)
         
-    # return:
-    # a. A list of compiled bytecode
-    # b. A dictionary where uid is the key and the value is the list of array indicies where I need to put in my label location 
-    # c. A dictionary where the uid is the key and the value is the index of the next instruction after the label instruction 
     def assemble_body(self, instruction_body):
         output = []
-        to_replace = {}
+        # {label_uid: [line_that_needs_this_label,]}
+        lines_that_need_label = {}
+        # {label_uid: label_line}
         label_locations = {}
-        lambda_location = {}
+        # {lambda_uid: line_that_needs_the_ip_of_this_lambda}
+        lines_that_need_lambda = {}
         for instruction in instruction_body:
             opp_code = instruction[0]
             operand = instruction[1]
@@ -104,44 +106,44 @@ class Assembler():
             elif(opp_code == OppCodes.save_continuation):
                 compiled = self.enum_to_byte(OppCodes.save_continuation) 
                 len_so_far = len(output)
-                l = to_replace.get(operand)
+                l = lines_that_need_label.get(operand)
                 if(l):
                     l.append(len_so_far)
                 else:
-                    to_replace[operand] = [len_so_far,]
+                    lines_that_need_label[operand] = [len_so_far,]
                 # Add zeroed data, that will be replaced with the actuall value later
                 compiled += self.uid_to_4_bytes(0)
                 output.append(compiled)
             elif(opp_code == OppCodes.if_false_branch):
                 compiled = self.enum_to_byte(OppCodes.if_false_branch) 
                 len_so_far = len(output) 
-                l = to_replace.get(operand)
+                l = lines_that_need_label.get(operand)
                 if(l):
                     l.append(len_so_far)
                 else:
-                    to_replace[operand] = [len_so_far,]
+                    lines_that_need_label[operand] = [len_so_far,]
                 # Add zeroed data, that will be replaced with the actuall value later
                 compiled += self.uid_to_4_bytes(0)
                 output.append(compiled)
             elif(opp_code == OppCodes.if_true_branch):
                 compiled = self.enum_to_byte(OppCodes.if_true_branch) 
                 len_so_far = len(output) 
-                l = to_replace.get(operand)
+                l = lines_that_need_label.get(operand)
                 if(l):
                     l.append(len_so_far)
                 else:
-                    to_replace[operand] = [len_so_far,]
+                    lines_that_need_label[operand] = [len_so_far,]
                 # Add zeroed data, that will be replaced with the actuall value later
                 compiled += self.uid_to_4_bytes(0)
                 output.append(compiled)
             elif(opp_code == OppCodes.branch):
                 compiled = self.enum_to_byte(OppCodes.branch) 
                 len_so_far = len(output) 
-                l = to_replace.get(operand)
+                l = lines_that_need_label.get(operand)
                 if(l):
                     l.append(len_so_far)
                 else:
-                    to_replace[operand] = [len_so_far,]
+                    lines_that_need_label[operand] = [len_so_far,]
                 # Add zeroed data, that will be replaced with the actuall value later
                 compiled += self.uid_to_4_bytes(0)
                 output.append(compiled)
@@ -149,11 +151,11 @@ class Assembler():
                 output.append(self.enum_to_byte(OppCodes.push))
             elif(opp_code == OppCodes.make_closure):
                 len_so_far = len(output)
-                l = lambda_location.get(operand)
+                l = lines_that_need_lambda.get(operand)
                 if(l):
-                    l.append(len_so_far)
+                    raise AssemblerError("make_closure uid not unique")
                 else:
-                    lambda_location[operand] = [len_so_far,]
+                    lines_that_need_lambda[operand] = len_so_far
                 # Add zeroed 4 bytes that will be replaced later
                 output.append(self.enum_to_byte(OppCodes.make_closure) + self.uid_to_4_bytes(0))
             elif(opp_code == OppCodes.set):
@@ -177,4 +179,63 @@ class Assembler():
                 raise AssemblerError("Should not have a data_end in the body")
             else:
                 raise AssemblerError(str(type(instruction)) + " is not one of the enums in OppCodes")
-        return (output, to_replace, label_locations, lambda_location)
+        return (output, lines_that_need_label, label_locations, lines_that_need_lambda)
+    
+    
+    def pretty_print(self, bodies):
+        cur = 0
+        for body in bodies:
+            for ins in body:
+                print(hex(cur).ljust(6), end="| ")
+                print(", ".join(hex(b) for b in ins))
+                cur += len(ins)
+            print("----------")
+    
+    def sub_in_labels(self, assembled_body, label_replacement, label_location, offset):
+        for label_uid in label_location:
+            label_line = label_location[label_uid]
+            ip = offset + (self.no_of_bytes_in_a_body(assembled_body[:label_line]))
+            lines_to_replace = label_replacement[label_uid]
+            for line in lines_to_replace:
+                assembled_body[line][1:5] = self.uid_to_4_bytes(ip)
+
+    def assemble(self):
+        bodies = []
+        # {procedure_uid: index_in_body}
+        index_of_procedure = {}
+        # {procedure_uid: (body_index, line_index)}
+        lines_that_need_procedure = {}
+        
+        assembled_consts = self.assemble_constants()
+        bodies.append(assembled_consts)
+        
+        (main_assembled, lines_in_main_that_need_label, label_locations, lines_in_main_that_need_lambda) = self.assemble_body(self.main_body)
+        bytes_so_far = self.no_of_bytes_in_list_body(bodies)
+        self.sub_in_labels(main_assembled, lines_in_main_that_need_label, label_locations, bytes_so_far)
+        for lambda_id in lines_in_main_that_need_lambda:
+            if(lines_that_need_procedure.get(lambda_id)):
+                raise AssemblerError("Trying to add an already existing uid to lines_that_need_procedure")
+            lines_that_need_procedure[lambda_id] = (len(bodies), lines_in_main_that_need_lambda[lambda_id])
+        bodies.append(main_assembled)
+        
+        for proc in self.procedures:
+            uid = proc[0]
+            proc_body = proc[1]
+            index_of_procedure[uid] = len(bodies)
+            (assembled_body, lines_that_need_label, label_locations, lines_that_need_lambda) = self.assemble_body(proc_body)
+            bytes_so_far = self.no_of_bytes_in_list_body(bodies)
+            self.sub_in_labels(assembled_body, lines_that_need_label, label_locations, bytes_so_far)
+            for lambda_id in lines_that_need_lambda:
+                if(lines_that_need_procedure.get(lambda_id)):
+                    raise AssemblerError("Trying to add an already existing uid to lines_that_need_procedure")
+                lines_that_need_procedure[lambda_id] = (len(bodies), lines_that_need_lambda[lambda_id])
+            bodies.append(assembled_body)
+
+        for lambda_id in lines_that_need_procedure:
+            (body_index, line_in_body) = lines_that_need_procedure[lambda_id]
+            lambda_pos_in_bodies = index_of_procedure[lambda_id]
+            lambda_pos = self.no_of_bytes_in_list_body(bodies[:lambda_pos_in_bodies])
+            bodies[body_index][line_in_body][1:5] = self.uid_to_4_bytes(lambda_pos)
+
+        self.pretty_print(bodies)
+

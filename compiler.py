@@ -322,17 +322,7 @@ if __name__ == "__main__":
     output = compiler.generate_human_readable()
     print(output, end='')
     assembler = Assembler(data, instructions, procedure)
-    assembler.assemble_constants()
-    (body, to_replace, label_loc, proc_locs) = assembler.assemble_body(instructions)
-    pretty_print_hex(body=body)
-    print(to_replace)
-    print(label_loc)
-    print(proc_locs)
-    (body, to_replace, label_loc, proc_locs) = assembler.assemble_body(procedure[0][1])
-    pretty_print_hex(body=body)
-    print(to_replace)
-    print(label_loc)
-    print(proc_locs)
+    assembler.assemble()
 
 
     
