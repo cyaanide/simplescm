@@ -1,6 +1,6 @@
 __pycache__/*
+compiled/*
 code.scm
-code.scm~
-ss.md
+notes.md
 .DS_Store
 

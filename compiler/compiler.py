@@ -180,7 +180,7 @@ class Compiler():
         if(not isinstance(expression, SDefine)):
             raise SynError("Expression is not of type SDefine, instead is of type " + str(type(expression)))
         self.compile_expression(list_to_add_to, expression.expression, False)
-        list_to_add_to.append((OppCodes.define, expression.var))
+        list_to_add_to.append((OppCodes.define, str(expression.var)))
 
     # Set is allowed to be anywhere it wants to be, the result of the set expression will be the new value of the computed argument
     def compile_set(self, list_to_add_to, expression, tail):
@@ -306,6 +306,7 @@ class Compiler():
 
 if __name__ == "__main__":
     filename = sys.argv[1]
+    output = sys.argv[2]
     with open(filename) as file_name:
         code = file_name.read()
     ast_generator = ASTGenerator(code)
@@ -317,6 +318,9 @@ if __name__ == "__main__":
 
     assembler = Assembler(constants, main, procedures)
     assembled = assembler.assemble()
+    with open(output, "wb") as output_file:
+        output_file.write(assembled)
+        
     print(assembler.debug_output(), end="")
 
 

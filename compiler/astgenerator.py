@@ -304,7 +304,7 @@ class ASTGenerator:
             if(len(define_expressions) != 2):
                 self.report(special_form_end, "define should only have 2 arguments")
             var = define_expressions[0]
-            if(self.is_built_in_func(var)):
+            if(self.is_built_in_func(str(var))):
                 self.report(special_form_end, "cannot set the value of a built in function")
             if(not isinstance(var, SVariable)):
                 self.report(special_form_end, "first argument to define should be a variable")
