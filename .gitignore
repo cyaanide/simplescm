@@ -1,5 +1,7 @@
 __pycache__/*
 compiled/*
+.vscode/*
+build/*
 code.scm
 notes.md
 .DS_Store
