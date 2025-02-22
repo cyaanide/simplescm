@@ -1,6 +1,9 @@
 #include <cstdint>
+#include <unordered_map>
+#include <string>
+#include <iostream>
 
-enum OpCodes: std::uint8_t
+enum OppCodes: std::uint8_t
 {
     opp_null = 0,
     lookup = 1,
@@ -21,6 +24,7 @@ enum OpCodes: std::uint8_t
     data_end = 16,
     label = 17,
     proc_end = 18,
+    const_data = 19,
 };
 
 enum Types: std::uint8_t
@@ -37,4 +41,23 @@ enum Defaults: std::uint8_t
     boolean_false = 1,
     boolean_true = 2,
     empty_list = 3,
+};
+
+enum BuiltInFunctions : std::uint8_t
+{
+    not_built_in = 0,
+    addition,
+    subtraction,
+    division,
+    multiplication,
+    cons,
+    car,
+    cdr,
+    is_number,
+    is_string,
+    is_pair,
+    is_symbol,
+    eq,
+    equal,
+    not_built_in_last,
 };

@@ -4,4 +4,4 @@ project(vm)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-add_executable(vm vm.cpp)
+add_executable(vm vm.cpp scheme_objects.cpp)

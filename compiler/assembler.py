@@ -13,16 +13,20 @@ class Assembler():
         self.assembled = []
         
     def enum_to_byte(self, oppcode):
-        return bytearray(oppcode.value.to_bytes(1))
+        return bytearray(oppcode.value.to_bytes(1, byteorder = "little"))
     
     def num_to_byte(self, num):
-        return bytearray(num.to_bytes(1))
+        return bytearray(num.to_bytes(1, byteorder = "little"))
 
     def uid_to_4_bytes(self, uid):
-        return bytearray(uid.to_bytes(4))
+        return bytearray(uid.to_bytes(4, byteorder = "little"))
 
-    def float_to_8_bytes(self, num):
+    def double_to_8_bytes(self, num):
         return bytearray(struct.pack("<d", num))
+
+    # Return a null terminated string in bytearray
+    def string_to_byes(self, str):
+        return bytearray(str, "ascii") + bytearray(1)
 
     def assemble_constant(self, constant):
         output = bytearray()
@@ -30,21 +34,25 @@ class Assembler():
         typ = constant[1][0]
         values = constant[1][1]
         if(typ ==  Types.number):
+            output += self.enum_to_byte(OppCodes.const_data)
             output += self.uid_to_4_bytes(uid)
             output += self.enum_to_byte(Types.number)
-            output += self.float_to_8_bytes(values[0])
+            output += self.double_to_8_bytes(values[0])
             return output
         elif(typ == Types.string):
+            output += self.enum_to_byte(OppCodes.const_data)
             output += self.uid_to_4_bytes(uid)
             output += self.enum_to_byte(Types.string)
             output += self.string_to_byes(values[0])
             return output
         elif(typ == Types.symbol):
+            output += self.enum_to_byte(OppCodes.const_data)
             output += self.uid_to_4_bytes(uid)
             output += self.enum_to_byte(Types.symbol)
             output += self.string_to_byes(values[0])
             return output
         elif(typ == Types.list):
+            output += self.enum_to_byte(OppCodes.const_data)
             output += self.uid_to_4_bytes(uid)
             output += self.enum_to_byte(Types.list)
             output += self.uid_to_4_bytes(len(values))
@@ -67,10 +75,6 @@ class Assembler():
     def no_of_bytes_in_list_body(self, lst_bodies):
         return sum(map(self.no_of_bytes_in_a_body, lst_bodies))
     
-    # Return a null terminated string in bytearray
-    def string_to_byes(self, str):
-        return bytearray(str, "ascii") + bytearray(1)
-        
     def assemble_body(self, instruction_body):
         output = []
         # {label_uid: [line_that_needs_this_label,]}
