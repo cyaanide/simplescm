@@ -23,6 +23,7 @@ class OppCodes(Enum):
     label = 17
     proc_end = 18
     const_data = 19
+    unbind = 20
 
 class Types(Enum):
     # Opp codes for types of constants

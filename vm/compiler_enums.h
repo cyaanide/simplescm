@@ -1,7 +1,4 @@
 #include <cstdint>
-#include <unordered_map>
-#include <string>
-#include <iostream>
 
 enum OppCodes: std::uint8_t
 {
@@ -25,6 +22,7 @@ enum OppCodes: std::uint8_t
     label = 17,
     proc_end = 18,
     const_data = 19,
+    unbind = 20,
 };
 
 enum Types: std::uint8_t
@@ -59,5 +57,7 @@ enum BuiltInFunctions : std::uint8_t
     is_symbol,
     eq,
     equal,
+    display,
+    num_equal,
     not_built_in_last,
 };

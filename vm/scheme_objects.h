@@ -1,5 +1,8 @@
 #include "compiler_enums.h"
-#include <cstdint>
+#include <unordered_map>
+#include <stack>
+#include <string>
+#include <iostream>
 
 // typedef std::unordered_map<std::string, std::shared_ptr<ScmObj>> environment;
 
@@ -9,7 +12,16 @@ class ScmObj
     virtual void print(void) = 0;
 };
 
-using environment = std::unordered_map<std::string, std::shared_ptr<ScmObj>>;
+using env_map = std::unordered_map<std::string, std::shared_ptr<ScmObj>>;
+
+class ScmEnv {
+
+    public:
+    std::shared_ptr<ScmEnv> prev;
+    std::shared_ptr<env_map> map;
+    ScmEnv(std::shared_ptr<ScmEnv> prev_initial);
+    
+};
 
 class ScmInt : public ScmObj
 {
@@ -60,9 +72,22 @@ class ScmClosure : public ScmObj
     public:
     bool built_in;
     BuiltInFunctions func;
-    void print(void) override;
-    ScmClosure(bool built_in, BuiltInFunctions func, uint32_t address, std::shared_ptr<environment> envt);
-
-    // A pointer to the environment
     u_int32_t porc_address;
+    std::shared_ptr<ScmEnv> closure_env;
+
+    void print(void) override;
+    ScmClosure(bool built_in, BuiltInFunctions func, uint32_t address, std::shared_ptr<ScmEnv> envt);
+
+};
+
+using scm_stack = std::stack<std::shared_ptr<ScmObj> >;
+
+class ScmCont {
+    public:
+    uint32_t resume_loc;
+    std::shared_ptr<ScmEnv> env;
+    std::shared_ptr<scm_stack> saved_stack;
+    std::shared_ptr<ScmCont> prev;
+    ScmCont(uint32_t resume_loc_initial, std::shared_ptr<ScmEnv> env_initial, std::shared_ptr<scm_stack> saved_stack_initial, std::shared_ptr<ScmCont> prev_initial):
+        resume_loc(resume_loc_initial), env(env_initial), saved_stack(saved_stack_initial), prev(prev_initial) {}
 };

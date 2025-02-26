@@ -239,6 +239,7 @@ class Compiler():
         self.compile_arguments(list_to_add_to, bindings, False)
         list_to_add_to.append((OppCodes.bind, vars))
         self.compile_sequence(list_to_add_to, expression.body, tail)
+        list_to_add_to.append((OppCodes.unbind, None))
         
     def compile_expression(self, list_to_add_to,  expression, tail):
         if(isinstance(expression, SConstant)):

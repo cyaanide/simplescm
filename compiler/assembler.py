@@ -88,6 +88,8 @@ class Assembler():
             operand = instruction[1]
             if(opp_code == OppCodes.opp_null):
                 output.append(self.enum_to_byte(OppCodes.opp_null))
+            elif(opp_code == OppCodes.unbind):
+                output.append(self.enum_to_byte(OppCodes.unbind))
             elif(opp_code == OppCodes.lookup):
                 compiled = self.enum_to_byte(OppCodes.lookup)
                 if(type(operand) != str):
