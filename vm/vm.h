@@ -55,5 +55,9 @@ class VM
         std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::equal, "equal?"),
         std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::display, "display"),
         std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::num_equal, "="),
+        std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::num_greater, ">"),
+        std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::num_greater_equal, ">="),
+        std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::num_less, "<"),
+        std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::num_less_equal, "<="),
     };
 };

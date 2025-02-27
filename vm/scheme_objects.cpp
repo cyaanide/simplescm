@@ -12,39 +12,52 @@ ScmEnv::ScmEnv(std::shared_ptr<ScmEnv> prev_initial): prev(prev_initial)
 
 void ScmInt::print(void)
 {
-    std::cout << " " << val << " ";
+    std::cout << val;
     return;
 }
 
 void ScmSym::print(void)
 {
-    std::cout << " '" << val << " ";
+    std::cout << val;
+    return;
 }
 
 void ScmStr::print(void)
 {
-    std::cout << " " << val << " ";
+    std::cout << val;
+    return;
+}
+
+void ScmBool::print(void)
+{
+    std::string str;
+    if(val) {
+        str = "#t";
+    } else {
+        str = "#f";
+    }
+    std::cout << str;
 }
 
 void ScmClosure::print(void)
 {
     if(built_in) {
-        std::cout << "Built_in_procedure " << func << " ";
+        std::cout << "<built_in_procedure " << (int)func << ">";
     } else {
-        std::cout << "user_defined_procedure " << std::hex << porc_address << " ";
+        std::cout << "<user_defined_procedure " << std::hex << porc_address << ">";
     }
 }
 
 void ScmPair::print(void)
 {
     if(car == nullptr) {
-        std::cout << " () ";
+        std::cout << "()";
         return;
     } 
     
-    std::cout << " (";
+    std::cout << "( ";
     car->print();
-    std::cout << ".";
+    std::cout << " . ";
     cdr->print();
     std::cout << " )";
 }

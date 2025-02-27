@@ -168,8 +168,8 @@ void VM::vm_init(void)
         top_level_env->map->insert(std::pair<std::string, std::shared_ptr<ScmObj> >(proc_name, closure));
     }
     constants = {
-        std::pair<uint32_t, std::shared_ptr<ScmObj> >(Defaults::boolean_true, std::make_shared<ScmStr>("#t")),
-        std::pair<uint32_t, std::shared_ptr<ScmObj> >(Defaults::boolean_false, nullptr),
+        std::pair<uint32_t, std::shared_ptr<ScmObj> >(Defaults::boolean_true, std::make_shared<ScmBool>(true)),
+        std::pair<uint32_t, std::shared_ptr<ScmObj> >(Defaults::boolean_false, std::make_shared<ScmBool>(false)),
         std::pair<uint32_t, std::shared_ptr<ScmObj> >(Defaults::empty_list, std::make_shared<ScmPair>(nullptr, nullptr)),
     };
 }
@@ -215,260 +215,9 @@ void VM::is_stack_size(int size, std::string func_name)
 {
     if(STACK->size() != size) {
         std::cout << func_name << " takes only " << size << " no of arguments" << std::endl;
+        std::cout << "stack size is " << STACK->size() << " instead" << std::endl;
         exit(1);
     }
-}
-
-void VM::apply_builtin(std::shared_ptr<ScmClosure> closure)
-{
-    if(!closure->built_in) {
-        std::cout << "Called VM::apply_builtin on a non built in closure";
-    }
-    // All the built in functions are technically top level functions, so set the environment to top_level when executing them
-    ENVT = top_level_env;
-    
-    BuiltInFunctions func = closure->func;
-    if(func == BuiltInFunctions::addition) {
-
-
-        // If let consumes the exact number of arguments it pushes on the stack
-        // And only argument generation in let and a proc application causes the stack to grow,
-        // This would mean that its guaranteed that the stack will be empty when a function is
-        // called, So I THINK i could change this to consume any number of arguments
-        is_stack_size(2, "+");
-
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_int = std::dynamic_pointer_cast<ScmInt>(a);
-        if(a_int == nullptr) {
-            std::cout << "Please provide a number to +" << std::endl;
-            exit(1);
-        }
-
-        auto b = STACK->top();
-        STACK->pop();
-        auto b_int = std::dynamic_pointer_cast<ScmInt>(b);
-        if(b_int == nullptr) {
-            std::cout << "Please provide a number to +" << std::endl;
-            exit(1);
-        }
-
-        auto ans = std::make_shared<ScmInt>(a_int->val + b_int->val);
-        VALUE = ans;
-
-    } else if(func == BuiltInFunctions::display) {
-
-        is_stack_size(1, "display");
-        auto obj = STACK->top();
-        STACK->pop();
-        if(obj == nullptr) {
-            std::cout << "#f";
-        } else {
-            obj->print();
-        }
-        std::cout << std::endl;
-
-    } else if(func == BuiltInFunctions::car) {
-        
-        is_stack_size(1, "car");
-        auto obj = STACK->top();
-        STACK->pop();
-        auto fin = std::dynamic_pointer_cast<ScmPair>(obj);
-        if(fin == nullptr) {
-            std::cout << "not a pair, can't take car of it" << std::endl;
-            exit(1);
-        }
-        VALUE = fin->car;
-
-    } else if(func == BuiltInFunctions::cdr) {
-
-        is_stack_size(1, "car");
-        auto obj = STACK->top();
-        STACK->pop();
-        auto fin = std::dynamic_pointer_cast<ScmPair>(obj);
-        if(fin == nullptr) {
-            std::cout << "not a pair, can't take cdr of it" << std::endl;
-            exit(1);
-        }
-        VALUE = fin->cdr;
-        
-    } else if(func == BuiltInFunctions::subtraction) {
-        
-        is_stack_size(2, "-");
-
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_int = std::dynamic_pointer_cast<ScmInt>(a);
-        if(a_int == nullptr) {
-            std::cout << "Please provide a number to -" << std::endl;
-            exit(1);
-        }
-
-        auto b = STACK->top();
-        STACK->pop();
-        auto b_int = std::dynamic_pointer_cast<ScmInt>(b);
-        if(b_int == nullptr) {
-            std::cout << "Please provide a number to -" << std::endl;
-            exit(1);
-        }
-
-        auto ans = std::make_shared<ScmInt>(a_int->val - b_int->val);
-        VALUE = ans;
-
-    } else if(func == BuiltInFunctions::division) {
-        
-        is_stack_size(2, "/");
-
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_int = std::dynamic_pointer_cast<ScmInt>(a);
-        if(a_int == nullptr) {
-            std::cout << "Please provide a number to /" << std::endl;
-            exit(1);
-        }
-
-        auto b = STACK->top();
-        STACK->pop();
-        auto b_int = std::dynamic_pointer_cast<ScmInt>(b);
-        if(b_int == nullptr) {
-            std::cout << "Please provide a number to /" << std::endl;
-            exit(1);
-        }
-
-        auto ans = std::make_shared<ScmInt>(a_int->val / b_int->val);
-        VALUE = ans;
-
-    } else if(func == BuiltInFunctions::multiplication) {
-        
-        is_stack_size(2, "*");
-
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_int = std::dynamic_pointer_cast<ScmInt>(a);
-        if(a_int == nullptr) {
-            std::cout << "Please provide a number to /" << std::endl;
-            exit(1);
-        }
-
-        auto b = STACK->top();
-        STACK->pop();
-        auto b_int = std::dynamic_pointer_cast<ScmInt>(b);
-        if(b_int == nullptr) {
-            std::cout << "Please provide a number to *" << std::endl;
-            exit(1);
-        }
-
-        auto ans = std::make_shared<ScmInt>(a_int->val * b_int->val);
-        VALUE = ans;
-
-    } else if(func == BuiltInFunctions::cons) {
-        is_stack_size(2, "cons");
-        auto a = STACK->top();
-        STACK->pop();
-        auto b = STACK->top();
-        STACK->pop();
-        VALUE = std::make_shared<ScmPair>(a, b);
-    } else if(func == BuiltInFunctions::is_number) {
-        is_stack_size(1, "number?");
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_int = std::dynamic_pointer_cast<ScmInt>(a);
-        if(a_int == nullptr) {
-            VALUE = constants[Defaults::boolean_false];
-        } else {
-            VALUE = constants[Defaults::boolean_true];
-        }
-    } else if(func == BuiltInFunctions::is_string) {
-        is_stack_size(1, "string?");
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_str = std::dynamic_pointer_cast<ScmStr>(a);
-        if(a_str == nullptr) {
-            VALUE = constants[Defaults::boolean_false];
-        } else {
-            VALUE = constants[Defaults::boolean_true];
-        }
-    } else if(func == BuiltInFunctions::is_pair) {
-        is_stack_size(1, "pair?");
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_pair = std::dynamic_pointer_cast<ScmPair>(a);
-        if(a_pair == nullptr) {
-            VALUE = constants[Defaults::boolean_false];
-        } else {
-            VALUE = constants[Defaults::boolean_true];
-        }
-    } else if(func == BuiltInFunctions::is_symbol) {
-        is_stack_size(1, "symbol?");
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_sym = std::dynamic_pointer_cast<ScmSym>(a);
-        if(a_sym == nullptr) {
-            VALUE = constants[Defaults::boolean_false];
-        } else {
-            VALUE = constants[Defaults::boolean_true];
-        }
-    } else if(func == BuiltInFunctions::num_equal) {
-        is_stack_size(2, "=");
-
-        auto a = STACK->top();
-        STACK->pop();
-        auto a_int = std::dynamic_pointer_cast<ScmInt>(a);
-        if(a_int == nullptr) {
-            std::cout << "Please provide a number to =" << std::endl;
-            exit(1);
-        }
-
-        auto b = STACK->top();
-        STACK->pop();
-        auto b_int = std::dynamic_pointer_cast<ScmInt>(b);
-        if(b_int == nullptr) {
-            std::cout << "Please provide a number to =" << std::endl;
-            exit(1);
-        }
-
-        if(a_int->val == b_int->val) {
-            VALUE = constants[Defaults::boolean_true];
-        } else {
-            VALUE = constants[Defaults::boolean_false];
-        }
-        
-    } else if(func == BuiltInFunctions::eq) {
-        is_stack_size(2, "eq?");
-        auto a = STACK->top();
-        STACK->pop();
-        auto b = STACK->top();
-        STACK->pop();
-        
-        if(a == b) {
-            VALUE = constants[Defaults::boolean_true];
-        } else {
-            VALUE = constants[Defaults::boolean_false];
-        }
-
-        auto a_int = std::dynamic_pointer_cast<ScmInt>(a);
-        if(a_int != nullptr) {
-            auto b_int = std::dynamic_pointer_cast<ScmInt>(b);
-            if(b_int != nullptr) {
-                if(b_int->val == a_int->val) {
-                    VALUE = constants[Defaults::boolean_true];
-                }
-            }
-        }
-
-        auto a_sym = std::dynamic_pointer_cast<ScmSym>(a);
-        if(a_sym != nullptr) {
-            auto b_sym = std::dynamic_pointer_cast<ScmSym>(b);
-            if(b_sym != nullptr) {
-                if(b_sym->val == a_sym->val) {
-                    VALUE = constants[Defaults::boolean_true];
-                }
-            }
-        }
-    } else {
-        std::cout << "Unrecognised function " << (int)func << std::endl;
-    }
-    pop_continuation();
 }
 
 void VM::fetch_execute(void)
@@ -524,6 +273,7 @@ void VM::fetch_execute(void)
             std::shared_ptr<ScmClosure> closure = std::dynamic_pointer_cast<ScmClosure>(VALUE);
             if(closure == nullptr) {
                 std::cout << "Trying to apply a non procedure" << std::endl;
+                exit(1);
             }
             if(closure->built_in) {
                 apply_builtin(closure);
@@ -542,19 +292,18 @@ void VM::fetch_execute(void)
         } else if (code == OppCodes::save_continuation) {
             uint32_t resume_address;
             read_4_bytes(&resume_address);
-            auto new_cont = std::make_shared<ScmCont>(resume_address, ENVT, STACK, CONT);
-            CONT = new_cont;
+            push_continuation(resume_address);
         } else if (code == OppCodes::if_false_branch) {
             uint32_t branch_address;
             read_4_bytes(&branch_address);
-            if(VALUE == nullptr) {
+            if(VALUE == constants[Defaults::boolean_false]) {
                 file.seekg(branch_address);
                 check_file();
             }
         } else if (code == OppCodes::if_true_branch) {
             uint32_t branch_address;
             read_4_bytes(&branch_address);
-            if(VALUE != nullptr) {
+            if(VALUE != constants[Defaults::boolean_false]) {
                 file.seekg(branch_address);
                 check_file();
             }
@@ -572,17 +321,25 @@ void VM::fetch_execute(void)
             VALUE = new_closure;
         } else if (code == OppCodes::set) {
             std::string var = read_string();
-            auto val = lookup_var(var);
-            if(val == nullptr) {
+            std::shared_ptr<ScmEnv> cur = ENVT;
+            bool found = false;
+            while(cur != nullptr) {
+                auto obj = cur->map->find(var);
+                if (obj != cur->map->end()) {
+                    found = true;
+                    obj->second = VALUE;
+                }
+                cur = cur->prev;
+            }
+            if(!found) {
                 std::cout << "Unable to set " << var << " could not find value" << std::endl;
                 exit(1);
             }
-            val = VALUE;
         } else if (code == OppCodes::define) {
             std::string var = read_string();
             auto val = top_level_env->map->find(var);
             if(val != top_level_env->map->end()) {
-                std::cout << "Unable to define " << var << " , value already exists";
+                std::cout << "Unable to define " << var << " , value already exists" << std::endl;
                 exit(1);
             } else {
                 top_level_env->map->insert({var, VALUE});
@@ -601,7 +358,6 @@ void VM::fetch_execute(void)
         }
         read_byte(&code);
     }
-    std::cout << "Program exit" << std::endl;
     
 }
 
@@ -612,6 +368,7 @@ int main(int argc, char** argv)
         return -1;
     }
     std::ifstream file(argv[1], std::ios::binary);
+    // std::ifstream file("/Users/khilansantoki/Desktop/Study/simplescm/build/compiled", std::ios::binary);
     if(!file) {
         std::cout << "Error opening file\n";
         return 1;

@@ -59,5 +59,9 @@ enum BuiltInFunctions : std::uint8_t
     equal,
     display,
     num_equal,
+    num_greater,
+    num_greater_equal,
+    num_less,
+    num_less_equal,
     not_built_in_last,
 };

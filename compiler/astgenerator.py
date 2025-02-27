@@ -124,7 +124,7 @@ class ASTGenerator:
             start += 1
     
     def is_special_form(self, str):
-        return str in ["quote", "lambda", "if", "and", "or", "let", "set!", "begin", "define"]
+        return str in ["quote", "lambda", "if", "and", "or", "let", "set!", "begin", "define", "cond"]
 
     def is_built_in_func(self, str):
         return str in ["cons", "car", "cdr", "list", "string?", "pair?", "symbol?", "integer?", "eq?", "equal?", "eqv?"]
@@ -176,6 +176,36 @@ class ASTGenerator:
             raise SynError("Error at " + str(alternative_end) + ", If contains more expressions than required")
         return SIf(test, consequent, alternative) 
     
+    def dispach_cond(self, start, end):
+        test_action_pairs = self.consume_and_process_expressions(start, end)
+
+        if(len(test_action_pairs) == 0):
+            self.report(start, "cond should contain atleast one test action pair")
+
+        # Every pair should be a procapplication, with the test being the operator and the actions being the operands
+        for pair in test_action_pairs:
+            if(not isinstance(pair, SProcApplication)):
+                self.report(start, "Improper let")
+
+        for i in range(len(test_action_pairs) - 1):
+            if(isinstance(test_action_pairs[i].operator, SVariable)):
+                if(test_action_pairs[i].operator.value == "equal"):
+                    self.report(start, "equal should be the last branch in a cond")
+                    
+        cur = SBool("#f")
+        else_present = False
+        if(isinstance(test_action_pairs[-1].operator, SVariable)):
+            if(test_action_pairs[-1].operator.value == "else"):
+                else_present = True
+                cur = SIf(SBool("#t"), SBegin(test_action_pairs[-1].operands), cur)
+        
+        reversed_pairs = test_action_pairs[:-1] if else_present else test_action_pairs
+        reversed_pairs = reversed_pairs[::-1]
+        for pair in reversed_pairs:
+            cur = SIf(pair.operator, SBegin(pair.operands), cur)
+        
+        return cur
+        
     # start is the special form end
     def dispach_let(self, start, end):
         var_bindings_start, var_bindings_end = self.consume_expression(start, end)
@@ -312,6 +342,8 @@ class ASTGenerator:
             if(not isinstance(exp, Expression)):
                 self.report(special_form_end, "second arguemnt to define should be a scheme expression")
             return SDefine(var, exp)
+        if(special_form == "cond"):
+            return self.dispach_cond(special_form_end, end)
         
     # start is the ( and end is the character after )
     # When string sliced, this procedure can see the string it is trying to process

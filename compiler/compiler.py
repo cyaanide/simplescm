@@ -188,9 +188,9 @@ class Compiler():
             raise SynError("Expression is not of type SSet, instead is of type " + str(type(expression)))
         # Compute the argument to set in non tail position
         self.compile_expression(list_to_add_to, expression.expression, False)
-        list_to_add_to.append((OppCodes.set, expression.variable))
+        list_to_add_to.append((OppCodes.set, expression.variable.value))
         if(tail):
-            list_to_add_to.append("return")
+            list_to_add_to.append((OppCodes.ret, None))
     
     def compile_and(self, list_to_add_to, expression, tail):
         if(not isinstance(expression, SAnd)):

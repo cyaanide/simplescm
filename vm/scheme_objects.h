@@ -58,14 +58,13 @@ class ScmPair : public ScmObj
     ScmPair(std::shared_ptr<ScmObj> initial_car, std::shared_ptr<ScmObj> initial_cdr) : car(initial_car), cdr(initial_cdr) {}
 };
 
-// class ScmBool : public ScmObj
-// {
-//     public:
-//     bool val;
-//     void print(void) override;
-//     ScmBool(bool initial): val(initial) {}
-    
-// };
+class ScmBool : public ScmObj
+{
+    public:
+    bool val;
+    void print(void) override;
+    ScmBool(bool initial): val(initial) {}
+};
 
 class ScmClosure : public ScmObj
 {

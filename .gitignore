@@ -4,6 +4,7 @@ compiled/*
 .vscode/*
 build/*
 code.scm
+code.scm~
 notes.md
 .DS_Store
 
