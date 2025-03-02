@@ -414,6 +414,7 @@ int main(int argc, char** argv)
                 window(text("Current Environment") , virtual_machine.draw_environment() | flex),
                 window(text("Previous Environment") , virtual_machine.draw_prev_environment()),
             }) | flex,
+            virtual_machine.draw_conts(),
         });
     });
 

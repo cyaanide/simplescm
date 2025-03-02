@@ -18,11 +18,13 @@ class VM
     void clear_out(void);
     bool fetch_execute(void);
     ftxui::Element draw_stack(void);
+    ftxui::Element draw_stack(std::shared_ptr<scm_stack> stck);
     ftxui::Element draw_value_register(void);
     ftxui::Element draw_instructions(void);
     ftxui::Element draw_environment(void);
     ftxui::Element draw_prev_environment(void);
     ftxui::Element draw_current_out(void);
+    ftxui::Element draw_conts(void);
 
     private:
     // VM Registers

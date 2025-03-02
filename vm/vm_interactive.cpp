@@ -1,5 +1,6 @@
 #include "vm.h"
 #include <iterator>
+#include <algorithm>
 
 ftxui::Element VM::draw_value_register()
 {
@@ -133,6 +134,26 @@ ftxui::Element VM::draw_stack()
     return ftxui::vbox(r);
 }
 
+ftxui::Element VM::draw_stack(std::shared_ptr<scm_stack> stck)
+{
+    auto restore = std::make_shared<scm_stack>();
+    ftxui::Elements r;
+    r.push_back(ftxui::filler());
+    while(!stck->empty())
+    {
+        r.push_back(ftxui::separatorLight() | ftxui::dim);
+        r.push_back(ftxui::text(stck->top()->to_str()) | ftxui::center);
+        restore->push(stck->top());
+        stck->pop();
+    }
+    while(!restore->empty())
+    {
+        stck->push(restore->top());
+        restore->pop();
+    }
+    return ftxui::vbox(r);
+}
+
 ftxui::Element VM::draw_environment(void)
 {
     auto is_built_in = [](const std::pair<std::string, std::shared_ptr<ScmObj> >& p) {
@@ -216,4 +237,31 @@ ftxui::Element VM::draw_instructions()
     }
     file.seekg(backup);
     return ftxui::vbox(o);
+}
+
+ftxui::Element VM::draw_conts(void)
+{
+    ftxui::Elements conts;
+    auto cur_cont = CONT;
+    auto no_conts = 0;
+    while(cur_cont != nullptr) {
+        no_conts += 1;
+        cur_cont = cur_cont->prev;
+    }
+    
+    cur_cont = CONT;
+    for(int i = 0; i < 10 && i < no_conts; i++) {
+        std::stringstream stream;
+        stream << "0x" << std::hex << std::uppercase << (int) cur_cont->resume_loc;
+        auto add = ftxui::text(std::string("Return add: ") + std::string("<") + stream.str() + std::string(">"));
+        auto cur_stack = draw_stack(cur_cont->saved_stack);
+        if(i == 0) {
+            conts.push_back(ftxui::window(ftxui::text("Nth Cont"), ftxui::vbox({add, cur_stack})));
+        } else {
+            conts.push_back(ftxui::window(ftxui::text(std::string("N-") + std::to_string(i) + std::string("th Cont")), ftxui::vbox({add, cur_stack})));
+        }
+        cur_cont = cur_cont->prev;
+    }
+    // std::reverse(conts.begin(), conts.end());
+    return ftxui::vbox(conts);
 }
