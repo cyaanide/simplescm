@@ -1,6 +1,6 @@
 #include "vm.h"
 
-VM::VM(std::ifstream& source): file(source)
+VM::VM(std::ifstream& source, bool interactive): file(source), interactive(interactive)
 {
     // Get the file size
     file.seekg(0, std::ios::end);
@@ -15,6 +15,8 @@ VM::VM(std::ifstream& source): file(source)
     CONT = top_level_cont;
     VALUE = std::shared_ptr<ScmObj>(nullptr);
     STACK = std::make_shared<scm_stack>();
+    vm_init();
+    init_constants();
 }
 
 void inline VM::read_byte(uint8_t* dest)
@@ -67,11 +69,16 @@ void inline VM::check_file(void)
         exit(1);
     }
 }
+
 void VM::run(void)
 {
-    vm_init();
-    init_constants();
-    fetch_execute();
+    if(interactive) {
+        std::cout << "Cannot run() while in interactive mode" << std::endl;
+        exit(1);
+    }
+    while(fetch_execute()) {
+        //
+    }
 }
 
 void VM::print_list(uint32_t uid)
@@ -220,145 +227,147 @@ void VM::is_stack_size(int size, std::string func_name)
     }
 }
 
-void VM::fetch_execute(void)
+bool VM::fetch_execute(void)
 {
     uint8_t code;
     read_byte(&code);
     check_file();
-    while(code != OppCodes::ext) {
-        if(code == OppCodes::opp_null) {
-            // Nothing to do
-        } else if (code == OppCodes::lookup) {
-            auto var = read_string();
-            check_file();
-            auto val = lookup_var(var);
-            if (val != nullptr) {
-                VALUE = val;
-            } else {
-                std::cout << "Unbound variable " << var << std::endl;
-                exit(1);
-            }
-        } else if (code == OppCodes::load_const) {
-            uint32_t uid;
-            read_4_bytes(&uid);
-            check_file();
-            auto iter = constants.find(uid);
-            if (iter != constants.end()) {
-                VALUE = iter->second;
-            } else {
-                std::cout << "Unbound constant with uid " << uid << std::endl;
-                exit(1);
-            }
-        } else if (code == OppCodes::bind) {
-            uint8_t no_vars;
-            read_byte(&no_vars);
-            check_file();
-            
-            // Create and set the new environment
-            auto new_env = std::make_shared<ScmEnv>(ENVT);
-            ENVT = new_env;
-            for(auto i = 0; i < no_vars; i++) {
-                auto var_str = read_string();
-                check_file();
-                if(!STACK->empty()) {
-                    std::shared_ptr<ScmObj> var_val = STACK->top();
-                    STACK->pop();
-                    ENVT->map->insert({var_str, var_val});
-                } else {
-                    std::cout << "Error: empty stack while trying to bind variables" << std::endl;
-                    exit(1);
-                }
-            }
-        } else if (code == OppCodes::apply) {
-            std::shared_ptr<ScmClosure> closure = std::dynamic_pointer_cast<ScmClosure>(VALUE);
-            if(closure == nullptr) {
-                std::cout << "Trying to apply a non procedure" << std::endl;
-                exit(1);
-            }
-            if(closure->built_in) {
-                apply_builtin(closure);
-            } else {
-                ENVT = closure->closure_env;
-                // !! This is a converstion from unsigned int to int, which might be lossy !!
-                file.seekg(closure->porc_address);
-                check_file();
-            }
-            // Need to read in the next instruction to process
-            read_byte(&code);
-            check_file();
-            continue;
-        } else if (code == OppCodes::ret) {
-            pop_continuation();
-        } else if (code == OppCodes::save_continuation) {
-            uint32_t resume_address;
-            read_4_bytes(&resume_address);
-            push_continuation(resume_address);
-        } else if (code == OppCodes::if_false_branch) {
-            uint32_t branch_address;
-            read_4_bytes(&branch_address);
-            if(VALUE == constants[Defaults::boolean_false]) {
-                file.seekg(branch_address);
-                check_file();
-            }
-        } else if (code == OppCodes::if_true_branch) {
-            uint32_t branch_address;
-            read_4_bytes(&branch_address);
-            if(VALUE != constants[Defaults::boolean_false]) {
-                file.seekg(branch_address);
-                check_file();
-            }
-        } else if (code == OppCodes::branch) {
-            uint32_t branch_address;
-            read_4_bytes(&branch_address);
-            file.seekg(branch_address);
-            check_file();
-        } else if (code == OppCodes::push) {
-            STACK->push(VALUE);
-        } else if (code == OppCodes::make_closure) {
-            uint32_t closure_address;
-            read_4_bytes(&closure_address);
-            auto new_closure = std::make_shared<ScmClosure>(false, BuiltInFunctions::not_built_in, closure_address, ENVT);
-            VALUE = new_closure;
-        } else if (code == OppCodes::set) {
-            std::string var = read_string();
-            std::shared_ptr<ScmEnv> cur = ENVT;
-            bool found = false;
-            while(cur != nullptr) {
-                auto obj = cur->map->find(var);
-                if (obj != cur->map->end()) {
-                    found = true;
-                    obj->second = VALUE;
-                }
-                cur = cur->prev;
-            }
-            if(!found) {
-                std::cout << "Unable to set " << var << " could not find value" << std::endl;
-                exit(1);
-            }
-        } else if (code == OppCodes::define) {
-            std::string var = read_string();
-            auto val = top_level_env->map->find(var);
-            if(val != top_level_env->map->end()) {
-                std::cout << "Unable to define " << var << " , value already exists" << std::endl;
-                exit(1);
-            } else {
-                top_level_env->map->insert({var, VALUE});
-            }
-        } else if (code == OppCodes::label) {
-            // Do nothing
-        } else if (code == OppCodes::proc_end) {
-            std::cout << "Reached proc end at " << (int) file.tellg() << std::endl;
-            exit(1);
-        } else if (code == OppCodes::data_start || code == OppCodes::data_end || code == OppCodes::const_data) {
-            std::cout << "Const data instruction at " << (int) file.tellg() << std::endl;
-            exit(1);
+    if(code == OppCodes::ext) {
+        return false;
+    } else if(code == OppCodes::opp_null) {
+        // Nothing to do
+    } else if (code == OppCodes::lookup) {
+        auto var = read_string();
+        check_file();
+        auto val = lookup_var(var);
+        if (val != nullptr) {
+            VALUE = val;
         } else {
-            std::cout << "Unknown instruction " << (int) code << " At position " << std::hex << (int)(file.tellg()) << std::endl;
+            std::cout << "Unbound variable " << var << std::endl;
             exit(1);
         }
-        read_byte(&code);
+    } else if (code == OppCodes::load_const) {
+        uint32_t uid;
+        read_4_bytes(&uid);
+        check_file();
+        auto iter = constants.find(uid);
+        if (iter != constants.end()) {
+            VALUE = iter->second;
+        } else {
+            std::cout << "Unbound constant with uid " << uid << std::endl;
+            exit(1);
+        }
+    } else if (code == OppCodes::bind) {
+        uint8_t no_vars;
+        read_byte(&no_vars);
+        check_file();
+        
+        // Create and set the new environment
+        auto new_env = std::make_shared<ScmEnv>(ENVT);
+        ENVT = new_env;
+        for(auto i = 0; i < no_vars; i++) {
+            auto var_str = read_string();
+            check_file();
+            if(!STACK->empty()) {
+                std::shared_ptr<ScmObj> var_val = STACK->top();
+                STACK->pop();
+                ENVT->map->insert({var_str, var_val});
+            } else {
+                std::cout << "Error: empty stack while trying to bind variables" << std::endl;
+                exit(1);
+            }
+        }
+    } else if (code == OppCodes::apply) {
+        std::shared_ptr<ScmClosure> closure = std::dynamic_pointer_cast<ScmClosure>(VALUE);
+        if(closure == nullptr) {
+            std::cout << "Trying to apply a non procedure" << std::endl;
+            exit(1);
+        }
+        if(closure->built_in) {
+            apply_builtin(closure);
+        } else {
+            ENVT = closure->closure_env;
+            // !! This is a converstion from unsigned int to int, which might be lossy !!
+            file.seekg(closure->porc_address);
+            check_file();
+        }
+    } else if (code == OppCodes::ret) {
+        pop_continuation();
+    } else if (code == OppCodes::save_continuation) {
+        uint32_t resume_address;
+        read_4_bytes(&resume_address);
+        push_continuation(resume_address);
+    } else if (code == OppCodes::if_false_branch) {
+        uint32_t branch_address;
+        read_4_bytes(&branch_address);
+        if(VALUE == constants[Defaults::boolean_false]) {
+            file.seekg(branch_address);
+            check_file();
+        }
+    } else if (code == OppCodes::if_true_branch) {
+        uint32_t branch_address;
+        read_4_bytes(&branch_address);
+        if(VALUE != constants[Defaults::boolean_false]) {
+            file.seekg(branch_address);
+            check_file();
+        }
+    } else if (code == OppCodes::branch) {
+        uint32_t branch_address;
+        read_4_bytes(&branch_address);
+        file.seekg(branch_address);
+        check_file();
+    } else if (code == OppCodes::push) {
+        STACK->push(VALUE);
+    } else if (code == OppCodes::make_closure) {
+        uint32_t closure_address;
+        read_4_bytes(&closure_address);
+        auto new_closure = std::make_shared<ScmClosure>(false, BuiltInFunctions::not_built_in, closure_address, ENVT);
+        VALUE = new_closure;
+    } else if (code == OppCodes::set) {
+        std::string var = read_string();
+        std::shared_ptr<ScmEnv> cur = ENVT;
+        bool found = false;
+        while(cur != nullptr) {
+            auto obj = cur->map->find(var);
+            if (obj != cur->map->end()) {
+                found = true;
+                obj->second = VALUE;
+            }
+            cur = cur->prev;
+        }
+        if(!found) {
+            std::cout << "Unable to set " << var << " could not find value" << std::endl;
+            exit(1);
+        }
+    } else if (code == OppCodes::define) {
+        std::string var = read_string();
+        auto val = top_level_env->map->find(var);
+        if(val != top_level_env->map->end()) {
+            std::cout << "Unable to define " << var << " , value already exists" << std::endl;
+            exit(1);
+        } else {
+            top_level_env->map->insert({var, VALUE});
+        }
+    } else if (code == OppCodes::label) {
+        // Do nothing
+    } else if (code == OppCodes::proc_end) {
+        std::cout << "Reached proc end at " << (int) file.tellg() << std::endl;
+        exit(1);
+    } else if (code == OppCodes::data_start || code == OppCodes::data_end || code == OppCodes::const_data) {
+        std::cout << "Const data instruction at " << (int) file.tellg() << std::endl;
+        exit(1);
+    } else if(code == OppCodes::unbind) {
+        if(ENVT->prev == nullptr) {
+            std::cout << "Trying to unbind at top level" << std::endl;
+            exit(1);
+        } else {
+            ENVT = ENVT->prev;
+        }
+    } else {
+        std::cout << "Unknown instruction " << (int) code << " At position " << std::hex << (int)(file.tellg()) << std::endl;
+        exit(1);
     }
-    
+    return true;
 }
 
 int main(int argc, char** argv)
@@ -373,6 +382,59 @@ int main(int argc, char** argv)
         std::cout << "Error opening file\n";
         return 1;
     }
-    VM virtual_machine = VM(file);
-    virtual_machine.run();
+    
+    bool interactive = false;
+    if(argc == 3) {
+        if(std::string(argv[2]) == std::string("-i")) {
+            interactive = true;
+        }
+    }
+    
+    VM virtual_machine = VM(file, interactive);
+
+    if(!interactive) {
+        virtual_machine.run();
+        exit(0);
+    } 
+
+    using namespace ftxui;
+
+    auto screen = ScreenInteractive::Fullscreen();
+    auto renderer = Renderer([&] {
+        return hbox({
+            vbox({
+                window(text("Registers") | color(Color::Blue), virtual_machine.draw_value_register()),
+                window(text("StdIO"), virtual_machine.draw_current_out()),
+                hbox({
+                    window(text("Instructions") | color(Color::Red), virtual_machine.draw_instructions() | flex) | size(WIDTH, EQUAL, Terminal::Size().dimx / 4),
+                    window(text("Stack") | color(Color::Green), virtual_machine.draw_stack()) | flex,
+                }) | flex
+            }) | size(WIDTH, EQUAL, Terminal::Size().dimx / 2) , 
+            vbox({
+                window(text("Current Environment") , virtual_machine.draw_environment() | flex),
+                window(text("Previous Environment") , virtual_machine.draw_prev_environment()),
+            }) | flex,
+        });
+    });
+
+    // Handle space key press
+    auto component = CatchEvent(renderer , [&](Event event) {
+        if (event == Event::Character('q')) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        if (event == Event::Character(' ')) {
+            virtual_machine.clear_out();
+            if(!virtual_machine.fetch_execute()) {
+                screen.ExitLoopClosure()();
+                return true;
+            }
+            screen.PostEvent(Event::Custom);  // Redraw UI
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(component);
+    return 0;
 }

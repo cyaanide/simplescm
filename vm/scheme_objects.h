@@ -1,4 +1,5 @@
 #include "compiler_enums.h"
+#include <fstream>
 #include <unordered_map>
 #include <stack>
 #include <string>
@@ -10,6 +11,7 @@ class ScmObj
 {
     public:
     virtual void print(void) = 0;
+    virtual std::string to_str(void) = 0;
 };
 
 using env_map = std::unordered_map<std::string, std::shared_ptr<ScmObj>>;
@@ -28,6 +30,7 @@ class ScmInt : public ScmObj
     public:
     double val;
     void print(void) override;
+    std::string to_str(void) override;
     ScmInt(double initial) : val(initial) {}
 };
 
@@ -36,6 +39,7 @@ class ScmStr : public ScmObj
     public:
     std::string val;
     void print(void) override;
+    std::string to_str(void) override;
     ScmStr(std::string initial): val(initial) {}
 
 };
@@ -45,6 +49,7 @@ class ScmSym : public ScmObj
     public:
     std::string val;
     void print(void) override;
+    std::string to_str(void) override;
     ScmSym(std::string initial): val(initial) {}
 
 };
@@ -55,6 +60,7 @@ class ScmPair : public ScmObj
     std::shared_ptr<ScmObj> car;
     std::shared_ptr<ScmObj> cdr;
     void print(void) override;
+    std::string to_str(void) override;
     ScmPair(std::shared_ptr<ScmObj> initial_car, std::shared_ptr<ScmObj> initial_cdr) : car(initial_car), cdr(initial_cdr) {}
 };
 
@@ -63,6 +69,7 @@ class ScmBool : public ScmObj
     public:
     bool val;
     void print(void) override;
+    std::string to_str(void) override;
     ScmBool(bool initial): val(initial) {}
 };
 
@@ -72,6 +79,7 @@ class ScmClosure : public ScmObj
     bool built_in;
     BuiltInFunctions func;
     u_int32_t porc_address;
+    std::string to_str(void) override;
     std::shared_ptr<ScmEnv> closure_env;
 
     void print(void) override;

@@ -1,13 +1,29 @@
-#include <fstream>
 #include "scheme_objects.h"
+
+#include <ftxui/dom/elements.hpp>
+#include <ftxui/dom/table.hpp>
+#include <ftxui/screen/screen.hpp>
+#include <ftxui/component/component.hpp>
+#include <ftxui/component/screen_interactive.hpp>
+#include <chrono>
+#include <ctime>
 
 
 class VM
 {
     public:
-    VM(std::ifstream& source);
+    VM(std::ifstream& source, bool interactive);
     void run(void);
     
+    void clear_out(void);
+    bool fetch_execute(void);
+    ftxui::Element draw_stack(void);
+    ftxui::Element draw_value_register(void);
+    ftxui::Element draw_instructions(void);
+    ftxui::Element draw_environment(void);
+    ftxui::Element draw_prev_environment(void);
+    ftxui::Element draw_current_out(void);
+
     private:
     // VM Registers
     uint32_t IP = 0;
@@ -16,14 +32,15 @@ class VM
     std::shared_ptr<ScmCont> CONT;
     std::shared_ptr<scm_stack> STACK;
 
+    bool interactive;
     std::ifstream& file;
     std::streampos file_size;
     std::shared_ptr<ScmEnv> top_level_env;
     std::shared_ptr<ScmCont> top_level_cont;
     std::unordered_map<uint32_t, std::shared_ptr<ScmObj>> constants;
+    std::string cur_out;
 
     void vm_init(void);
-    void fetch_execute(void);
     void init_constants(void);
     void check_file(void);
     void read_byte(uint8_t* dest);
@@ -36,6 +53,7 @@ class VM
     void apply_builtin(std::shared_ptr<ScmClosure> closure);
 
     std::string read_string();
+    bool print_instruction(std::string& out);
     std::shared_ptr<ScmObj> lookup_var(std::string variable);
 
     // update this to use the constexpr vectory or array

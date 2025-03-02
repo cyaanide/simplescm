@@ -41,11 +41,15 @@ void VM::apply_builtin(std::shared_ptr<ScmClosure> closure)
         is_stack_size(1, "display");
         auto obj = STACK->top();
         STACK->pop();
+        std::string o;
         if(obj == nullptr) {
-            std::cout << "#f";
+            o = "#f";
+            std::cout << o;
         } else {
-            obj->print();
+            o = obj->to_str();
+            std::cout << o;
         }
+        cur_out = o;
         std::cout << std::endl;
 
     } else if(func == BuiltInFunctions::car) {
