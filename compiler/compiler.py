@@ -1,4 +1,5 @@
 import sys
+import getopt
 from expressions import *
 from compilerenums import *
 from astgenerator import *
@@ -306,25 +307,59 @@ class Compiler():
                                                                                                                 
 
 if __name__ == "__main__":
-    filename = sys.argv[1]
-    output = sys.argv[2]
-    with open(filename) as file_name:
+
+    def print_help():
+        print("Usage: python3 compiler.py -i <input_file> -o <output_file>")
+        print("Optional arguments:")
+        print("\t1) To generate compiled code in human readable form: -c <file_name>")
+        print("\t2) To generate assembled code in human readable form: -a <file_name>")
+
+    compiled_human_readable = False
+    assembled_human_readable = False
+    compiled_verbose = None
+    assembled_verbose = None
+    input_file = None
+    output_file = None
+
+    opts, args = getopt.getopt(sys.argv[1:], "i:o:c:a:h", [])
+    for opt, arg in opts:
+        if(opt == "-i"):
+            input_file = arg
+        elif(opt == "-h"):
+            print_help()
+        elif(opt == "-o"):
+            output_file = arg
+        elif(opt == "-c"):
+            compiled_human_readable = True
+            compiled_verbose = arg
+        elif(opt == "-a"):
+            assembled_human_readable = True
+            assembled_verbose = arg
+        else:
+            print("invlid argument", opt)
+            print_help()
+            exit(1)
+
+    if((not input_file) or (not output_file)):
+        print_help()
+        exit(1)
+
+    with open(input_file) as file_name:
         code = file_name.read()
     ast_generator = ASTGenerator(code)
     ast = ast_generator.generate_ast()
 
     compiler = Compiler(ast)
     (constants, main, procedures) = compiler.compile()
-    print(compiler.debug_output(), end="")
+    if(compiled_human_readable):
+        with open(compiled_verbose, "w") as compiled_verbose_out:
+            compiled_verbose_out.write(compiler.debug_output())
 
     assembler = Assembler(constants, main, procedures)
     assembled = assembler.assemble()
-    with open(output, "wb") as output_file:
-        output_file.write(assembled)
-        
-    print(assembler.debug_output(), end="")
+    with open(output_file, "wb") as out_file:
+        out_file.write(assembled)
 
-
-    
-
-
+    if(assembled_human_readable):
+        with open(assembled_verbose, "w") as assembled_verbose_out:
+            assembled_verbose_out.write(assembler.debug_output())
