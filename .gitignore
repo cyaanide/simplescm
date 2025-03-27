@@ -7,4 +7,5 @@ build/*
 *.scm~
 notes.md
 .DS_Store
+demo_code/*
 

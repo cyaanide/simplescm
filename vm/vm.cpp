@@ -383,16 +383,16 @@ int main(int argc, char** argv)
         return 1;
     }
     
-    bool interactive = false;
+    bool debugging = false;
     if(argc == 3) {
-        if(std::string(argv[2]) == std::string("-i")) {
-            interactive = true;
+        if(std::string(argv[2]) == std::string("-d")) {
+            debugging = true;
         }
     }
     
-    VM virtual_machine = VM(file, interactive);
+    VM virtual_machine = VM(file, debugging);
 
-    if(!interactive) {
+    if(!debugging) {
         virtual_machine.run();
         exit(0);
     } 

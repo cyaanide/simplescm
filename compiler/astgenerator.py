@@ -231,14 +231,6 @@ class ASTGenerator:
             exp = exp[0]
             var_bindings.append((var, exp))
 
-        # extract the sequence of expressions
-        # let_body_start, let_body_end = self.consume_expression(var_bindings_end, end)
-        # if(let_body_end == None):
-        #     self.report(let_body_start, "improper let, should have the let body")
-        # if(not self.code[let_body_start] == '('):
-        #     self.report(let_body_start, "improper let, missing (")
-        # expressions = self.consume_and_process_expressions(let_body_start + 1, let_body_end - 1)
-
         expressions = self.consume_and_process_expressions(var_bindings_end, end)
         if(len(expressions) == 0):
             self.report(var_bindings_end, "improper let, the body should contain atleast one expression")

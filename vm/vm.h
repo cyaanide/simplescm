@@ -79,5 +79,6 @@ class VM
         std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::num_greater_equal, ">="),
         std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::num_less, "<"),
         std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::num_less_equal, "<="),
+        std::pair<BuiltInFunctions, std::string>(BuiltInFunctions::modulo, "%"),
     };
 };

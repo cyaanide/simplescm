@@ -63,5 +63,6 @@ enum BuiltInFunctions : std::uint8_t
     num_greater_equal,
     num_less,
     num_less_equal,
+    modulo,
     not_built_in_last,
 };

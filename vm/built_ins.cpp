@@ -337,6 +337,28 @@ void VM::apply_builtin(std::shared_ptr<ScmClosure> closure)
         } else {
             VALUE = constants[Defaults::boolean_false];
         }
+    } else if(func == BuiltInFunctions::modulo){
+        is_stack_size(2, "%");
+
+        auto a = STACK->top();
+        STACK->pop();
+        auto a_int = std::dynamic_pointer_cast<ScmInt>(a);
+        if(a_int == nullptr) {
+            std::cout << "Please provide a number to %" << std::endl;
+            exit(1);
+        }
+
+        auto b = STACK->top();
+        STACK->pop();
+        auto b_int = std::dynamic_pointer_cast<ScmInt>(b);
+        if(b_int == nullptr) {
+            std::cout << "Please provide a number to %" << std::endl;
+            exit(1);
+        }
+        auto ans = std::make_shared<ScmInt>(int(a_int->val) % int(b_int->val));
+        VALUE = ans;
+
+
     } else if(func == BuiltInFunctions::num_less_equal){
         is_stack_size(2, "<=");
 
@@ -361,7 +383,6 @@ void VM::apply_builtin(std::shared_ptr<ScmClosure> closure)
         } else {
             VALUE = constants[Defaults::boolean_false];
         }
-
     } else {
         std::cout << "Unrecognised function " << (int)func << std::endl;
     }
