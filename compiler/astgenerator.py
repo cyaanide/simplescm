@@ -1,5 +1,14 @@
 from expressions import *
 
+
+class SynError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
+    def __str__(self):
+        return f"Error: {self.args[0]}"
+
+
 class ASTGenerator:
 
 
@@ -22,13 +31,6 @@ class ASTGenerator:
             loc (int): The location of the error
             msg (str): String to print to the user
         """
-        class SynError(Exception):
-            def __init__(self, message):
-                super().__init__(message)
-
-            def __str__(self):
-                return f"Error: {self.args[0]}"
-
         start = loc
 
         # Find the 'line' the loc belongs to
