@@ -104,44 +104,35 @@ void VM::init_constants(void)
     while(code == OppCodes::const_data) {
         uint32_t uid;
         read_4_bytes(&uid);
-        // std::cout << "UID is " << uid << std::endl;
         uint8_t type;
         read_byte(&type);
         if(type == Types::number) {
-            // std::cout << "number" << std::endl;
             double val;
             read_double(&val);
             auto num = std::make_shared<ScmInt>(val);
             constants.insert(std::pair<uint32_t, std::shared_ptr<ScmObj> >(uid, num));
             std::cout << std::fixed << std::setprecision(7);
-            // std::cout << "the double being read is " << val << std::endl;
 
         } else if(type == Types::string) {
             // std::cout << "string" << std::endl;
             std::string val = read_string();
             auto str = std::make_shared<ScmStr>(val);
             constants.insert(std::pair<uint32_t, std::shared_ptr<ScmObj> >(uid, str));
-            // std::cout << "the string being read is " << val << std::endl;
 
         } else if(type == Types::symbol) {
-            // std::cout << "symbol" << std::endl;
             std::string val = read_string();
             auto sym = std::make_shared<ScmSym>(val);
             constants.insert(std::pair<uint32_t, std::shared_ptr<ScmObj> >(uid, sym));
-            // std::cout << "the symbol being read is " << val << std::endl;
 
         } else if(type == Types::list) {
 
-            // std::cout << "list" << std::endl;
             uint32_t len_list;
             read_4_bytes(&len_list);
-            // std::cout << "len of list is " << len_list << std::endl;
             // Read in the uid's
             auto list_uids = std::vector<uint32_t>();
             for(int i = 0; i < len_list; i++) {
                 uint32_t uid;
                 read_4_bytes(&uid);
-                // std::cout << "list elem uid is " << uid << std::endl;
                 list_uids.push_back(uid);
             }
             
@@ -161,7 +152,6 @@ void VM::init_constants(void)
         std::cout << "Data section does not end with a data_end OppCode" << std::endl;
         exit(1);
     }
-    // std::cout << "finished generating constants" << std::endl;
 }
 
 void VM::vm_init(void)
@@ -377,7 +367,6 @@ int main(int argc, char** argv)
         return -1;
     }
     std::ifstream file(argv[1], std::ios::binary);
-    // std::ifstream file("/Users/khilansantoki/Desktop/Study/simplescm/build/compiled", std::ios::binary);
     if(!file) {
         std::cout << "Error opening file\n";
         return 1;
@@ -418,7 +407,6 @@ int main(int argc, char** argv)
         });
     });
 
-    // Handle space key press
     auto component = CatchEvent(renderer , [&](Event event) {
         if (event == Event::Character('q')) {
             screen.ExitLoopClosure()();
@@ -430,7 +418,7 @@ int main(int argc, char** argv)
                 screen.ExitLoopClosure()();
                 return true;
             }
-            screen.PostEvent(Event::Custom);  // Redraw UI
+            screen.PostEvent(Event::Custom);
             return true;
         }
         return false;
