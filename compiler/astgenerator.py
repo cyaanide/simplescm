@@ -272,14 +272,17 @@ class ASTGenerator:
         (variables_start, variables_end) = self.consume_expression(start, end)
         if(variables_end == None):
             self.report(start, "no bound variable list in lambda function")
+
         # This is to make sure we have parenthesis around the variable bound list
         if(not ((self.code[variables_start] == '(') and (self.code[variables_end-1] == ')'))):
             raise self.report(variables_start, "bound variable list not in proper format. Make sure the variables are enclosed in parenthesis")
+
         # Make sure every expression in the variable bound list is a variable
         variable_list = self.consume_and_process_expressions(variables_start + 1, variables_end - 1)
         for var in variable_list:
             if(not isinstance(var, SVariable)):
                 self.report(variables_start, "not all members of bound variable list are variables")
+        
         body = self.consume_and_process_expressions(variables_end, end)
         if(len(body) == 0):
             self.report(variables_end, "no body in lambda expression")
@@ -523,10 +526,6 @@ class ASTGenerator:
             return self.dispach_cond(special_form_end, end)
         self.report(start, "not a special form. Compiler design error")
 
-
-    # start is the ( and end is the character after )
-    # When string sliced, this procedure can see the string it is trying to process
-    def process_expression(self, start, end):
         """Process and generate SExpression
 
         Args:
@@ -536,16 +535,17 @@ class ASTGenerator:
         Returns:
             SExpression: Returns the processed expression
         """
+
+    # start is the ( and end is the character after )
+    # When string sliced, this procedure can see the string it is trying to process
+
+    def process_expression(self, start, end):
         c = self.code[start]
         if(self.is_numeric(start, end)):
             return SNumber(float(self.code[start:end]))
         # String
         elif(c == '"'):
             return SString(self.code[start+1:end-1])
-        # Quotes
-        elif(c == "'"):
-            # TODO: add quotation functionality using '
-            return None
         # Boolean
         elif(c == "#"):
             return SBool(self.code[start:end])
@@ -570,9 +570,9 @@ class ASTGenerator:
                     self.report(start, "improper procedure application")
                 operator = self.process_expression(operator_start, operator_end)
                 
-                # Process the operands
                 operands = []
                 previous_operand_end = operator_end
+                # Process the operands
                 while(True):
                     next_operand_start = self.ignore_whitespace(previous_operand_end, end - 1)
                     if(next_operand_start == None):
@@ -632,6 +632,7 @@ class ASTGenerator:
             else:
                 return False
 
+        
 
     def consume_expression(self, start, until=None):
         """Consume expression, this function tells us how to read an expression as a string
@@ -643,7 +644,7 @@ class ASTGenerator:
         Returns:
             (start, next_start): The tuple where start is the start of the expression and next_start is the index where the next expression could potentially start
         """
-        
+
         start = self.ignore_whitespace(start, until)
         if(start == None):
             return (None, None)

@@ -15,7 +15,9 @@ VM::VM(std::ifstream& source, bool interactive): file(source), interactive(inter
     CONT = top_level_cont;
     VALUE = std::shared_ptr<ScmObj>(nullptr);
     STACK = std::make_shared<scm_stack>();
+    // Load all the built-in functions into the top-level environment
     vm_init();
+    // Read all the constants from the input
     init_constants();
 }
 

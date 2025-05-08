@@ -8,7 +8,6 @@ import getopt
 
 class Compiler():
 
-
     def __init__(self, ast):
         """Comiler constructor
 
@@ -16,6 +15,7 @@ class Compiler():
             ast (List<SExpression>): Abstract Syntax Tree to be compiled
         """
         self.ast = ast
+
         # A list of tuples (uid, (Type, [vals,]))
         self.constants = []
         # A list of tuples (Opp, Input)
